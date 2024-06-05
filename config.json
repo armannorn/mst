@@ -1,0 +1,58 @@
+{
+    "data": {
+        "path": "Jun4_data.feather",
+        "target": "f",
+        "features": ["lat", "lon", "d15", "f15", "h_meas", "theta15", "N2"]
+    },
+    "scaling": {
+        "standard": ["f15", "theta15", "N2"],
+        "minmax": ["lat", "lon", "h_meas"],
+        "circular": ["d15"]
+    },
+    "architecture": {
+        "layers": [
+            {
+                "type": "dense",
+                "units": 128,
+                "activation": "relu"
+            },
+            {
+                "type": "dropout",
+                "rate": 0.1
+            },
+            {
+                "type": "dense",
+                "units": 128,
+                "activation": "relu"
+            },
+            {
+                "type": "dropout",
+                "rate": 0.1
+            },
+            {
+                "type": "dense",
+                "units": 128,
+                "activation": "relu"
+            },
+            {
+                "type": "dropout",
+                "rate": 0.1
+            },
+            {
+                "type": "Dense",
+                "units": 128,
+                "activation": "linear"
+            }
+        ],
+        "output_activation": "linear"
+    },
+    "training": {
+        "optimizer": "adam",
+        "learning_rate": 0.001,
+        "loss": "mse",
+        "epochs": 5,
+        "validation_split": 0.1,
+        "test_split": 0.1,
+        "batch_size": 256
+    }
+}
