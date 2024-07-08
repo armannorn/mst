@@ -1,8 +1,9 @@
 {
+    "cross_validation": {"n_splits":  2},
     "data": {
         "path": "Jun4_data.feather",
         "target": "f",
-        "features": ["lat", "lon", "d15", "f15", "h_meas", "theta15", "N2"]
+        "features": ["f15", "theta15", "N2"]
     },
     "scaling": {
         "standard": ["f15", "theta15", "N2"],
@@ -50,9 +51,9 @@
         "optimizer": "adam",
         "learning_rate": 0.001,
         "loss": "mse",
-        "epochs": 5,
+        "epochs": 10,
         "validation_split": 0.1,
         "test_split": 0.1,
-        "batch_size": 256
+        "batch_size": 512
     }
 }

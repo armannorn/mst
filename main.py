@@ -2,7 +2,7 @@ import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 from fpdf import FPDF
-from sklearn.model_selection import train_test_split
+from sklearn.model_selection import train_test_split, KFold
 from sklearn.preprocessing import StandardScaler, MinMaxScaler
 from sklearn.metrics import mean_absolute_error
 from tensorflow import keras
@@ -13,18 +13,15 @@ from keras.losses import MeanSquaredError
 from keras.metrics import MeanAbsoluteError
 from keras.layers import Dense, Dropout, Conv2D, Flatten
 import json
+from io import BytesIO
+from PIL import Image
+import os
+import logging
+import time
+from datetime import datetime
 
 
 def json_to_dict(path="config.json"):
-    """
-    Reads a JSON file from the specified path and converts it into a Python dictionary.
-
-    Parameters:
-    path (str): The file path to the JSON configuration file. Default is "config.json".
-
-    Returns:
-    dict: A dictionary representation of the JSON configuration file.
-    """
     try:
         with open(path, 'r') as file:
             config_dict = json.load(file)
@@ -49,101 +46,50 @@ def read_data(dconf: dict[str, any]) -> (pd.DataFrame, pd.Series):
 
 
 def apply_scaling(X: pd.DataFrame, sconf: dict) -> (pd.DataFrame, dict):
-    """
-    Apply scaling and transformations to the DataFrame X based on the provided configuration.
-
-    Parameters:
-    X (pd.DataFrame): The input DataFrame to be transformed.
-    config (dict): Configuration dictionary containing keys 'standard', 'minmax', and 'circular_transform' with lists of column names.
-
-    Returns:
-    (pd.DataFrame, dict): A tuple with the transformed DataFrame and a dictionary of fitted scalers.
-    """
     scalers = {}
-
-    # Standard scaling
     if sconf.get('standard'):
         standard_scaler = StandardScaler()
         standard_cols = sconf['standard']
-        X[standard_cols] = standard_scaler.fit_transform(X[standard_cols])
+        for col in standard_cols:
+            if col in X.columns:
+                X[col] = standard_scaler.fit_transform(X[col].to_numpy().reshape(-1, 1))
+
         scalers['standard'] = standard_scaler
 
-    # Min-Max scaling
     if sconf.get('minmax'):
         minmax_scaler = MinMaxScaler()
         minmax_cols = sconf['minmax']
-        X[minmax_cols] = minmax_scaler.fit_transform(X[minmax_cols])
+        for col in minmax_cols:
+            if col in X.columns:
+                X[col] = minmax_scaler.fit_transform(X[col].to_numpy().reshape(-1,1))
         scalers['minmax'] = minmax_scaler
-
-    # Circular transform
     if sconf.get('circular'):
         for col in sconf['circular']:
-            transformed = circular_transform(X[col])
-            X = X.drop(columns=[col])
-            X = pd.concat([X, transformed], axis=1)
-
+            if col in X.columns:
+                transformed = circular_transform(X[col])
+                X = X.drop(columns=[col])
+                X = pd.concat([X, transformed], axis=1)
     return X, scalers
 
 
-def split_data(X: pd.DataFrame, y: pd.Series, tconf: dict[str, any]):
-    """
-    Possibly we'll add something to stratify here...
-    :param X, y: Features and target
-    :param tconf: Training config
-    :return: Training and testing datasets.
-    """
-    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=tconf["test_split"], random_state=42)
-    return X_train, X_test, y_train, y_test
-
-
 def circular_transform(column: pd.Series, degrees: bool = True) -> pd.DataFrame:
-    """
-    Transforms a column of angular data into sine and cosine components.
-
-    Parameters:
-    column (pd.Series): The input column with angular data.
-    degrees (bool): If True, the input data is in degrees. If False, the data is in radians.
-
-    Returns:
-    pd.DataFrame: A DataFrame with two columns, 'sin' and 'cos', containing the sine and cosine of the input data.
-    """
     if degrees:
         radians = np.deg2rad(column)
     else:
         radians = column
-
     sin_values = np.sin(radians)
     cos_values = np.cos(radians)
-
     result = pd.DataFrame({
         f'{column.name}_sin': sin_values,
         f'{column.name}_cos': cos_values
     })
-
     return result
 
 
-def build_model(aconf, X_train):
-    """
-    Builds a Keras model based on the given configuration and training data.
-
-    Parameters:
-    config (dict): Configuration dictionary containing the model architecture.
-    X_train (pd.DataFrame or np.ndarray): Training data to determine the input shape.
-
-    Returns:
-    model (Sequential): The constructed Keras model.
-    """
+def build_model(aconf, input_shape):
     model = Sequential()
-
-    # Determine input shape from X_train
-    input_shape = X_train.shape[1:]
-
-    # Add the input layer
     first_layer = aconf["layers"][0]
     model.add(Dense(units=first_layer["units"], activation=first_layer["activation"], input_shape=input_shape))
-
-    # Add the remaining layers
     for layer in aconf["layers"][1:]:
         layer_type = layer["type"]
         if layer_type == "dense":
@@ -155,9 +101,7 @@ def build_model(aconf, X_train):
                              input_shape=layer.get("input_shape", None)))
         elif layer_type == "flatten":
             model.add(Flatten())
-
     model.add(Dense(units=1, activation=aconf["output_activation"]))
-
     return model
 
 
@@ -166,67 +110,83 @@ def compile_and_train(X_train, y_train, model, tconf):
         optimizer = Adam(learning_rate=tconf["learning_rate"])
     else:
         raise ValueError(f"Unsupported optimizer: {tconf['optimizer']}")
-
     if tconf["loss"] == "mse":
         loss = MeanSquaredError()
     else:
         raise ValueError(f"Unsupported loss function: {tconf['loss']}")
-
     model.compile(
         optimizer=optimizer, loss=loss, metrics=['mse']
     )
-
     history = model.fit(
         X_train, y_train, epochs=tconf['epochs'], validation_split=tconf['validation_split'],
         batch_size=tconf['batch_size']
     )
-
     return model, history
 
 
-def prepare_report(X_test, y_test, model, history, report_filename='report.pdf'):
-    # Calculate absolute error
-    y_pred = model.predict(X_test)
-    print(f"Predicted values: {y_pred}")
-    absolute_error = mean_absolute_error(y_test, y_pred)
+def prepare_report(cv_results, report_filename='report.pdf', config=None):
+    if config:
+        # Get the number of splits and features from the config
+        n_splits = config.get("cross_validation", {}).get("n_splits", "N/A")
+        features = config.get("data", {}).get("features", "N/A")
 
-    # Create loss history plot
-    plt.figure(figsize=(10, 6))
-    plt.plot(history.history['loss'], label='Train Loss')
-    plt.plot(history.history['val_loss'], label='Validation Loss')
-    plt.xlabel('Epochs')
-    plt.ylabel('Loss')
-    plt.title('Training and Validation Loss History')
-    plt.legend()
-    plt.grid(True)
-    plt.savefig('loss_history.png')
-    plt.close()
+    # Calculate mean and std of absolute error
+    mean_absolute_errors = [result['mae'] for result in cv_results]
+    mean_mae = np.mean(mean_absolute_errors)
+    std_mae = np.std(mean_absolute_errors)
 
     # Create the PDF
     pdf = FPDF()
-
-    # Add a page
     pdf.add_page()
-
-    # Set title and subtitle
     pdf.set_font("Arial", size=16)
-    pdf.cell(200, 10, txt="Model Evaluation Report", ln=True, align='C')
+    pdf.cell(200, 10, txt="Cross-Validation Report", ln=True, align='C')
+    pdf.ln(10)
+    pdf.set_font("Arial", size=12)
+
+    # Add number of splits and features used to the document
+    if config:
+        pdf.cell(200, 10, txt=f"Number of Cross-Validation Splits: {n_splits}", ln=True, align='L')
+        pdf.ln(5)
+        pdf.cell(200, 10, txt=f"Features Used: {', '.join(features)}", ln=True, align='L')
+        pdf.ln(10)
+
+    pdf.cell(200, 10, txt=f"Mean Absolute Error: {mean_mae:.2f} ± {std_mae:.2f}", ln=True, align='L')
     pdf.ln(10)
 
-    # Print the absolute error
-    pdf.set_font("Arial", size=12)
-    pdf.cell(200, 10, txt=f"Mean Absolute Error: {absolute_error:.2f}", ln=True, align='L')
-    pdf.ln(10)
+    for fold, result in enumerate(cv_results):
+        history = result['history']
+        plt.figure(figsize=(10, 6))
+        plt.plot(history.history['loss'], label='Train Loss')
+        plt.plot(history.history['val_loss'], label='Validation Loss')
+        plt.xlabel('Epochs')
+        plt.ylabel('Loss')
+        plt.title(f'Training and Validation Loss History - Fold {fold + 1}')
+        plt.legend()
+        plt.grid(True)
 
-    # Add the loss history plot
-    pdf.set_font("Arial", size=12)
-    pdf.cell(200, 10, txt="Loss History:", ln=True, align='L')
-    pdf.image('loss_history.png', x=10, y=None, w=190)
-    pdf.ln(85)  # Adjust this value based on the image size
+        # Save the plot to a BytesIO object
+        plot_buffer = BytesIO()
+        plt.savefig(plot_buffer, format='png')
+        plt.close()
+        plot_buffer.seek(0)
+
+        # Use PIL to open the image and save it in a compatible format for fpdf
+        image = Image.open(plot_buffer)
+        plot_filename = f'loss_history_fold_{fold + 1}.png'
+        image.save(plot_filename)
+
+        # Add the plot to the PDF
+        pdf.add_page()
+        pdf.set_font("Arial", size=12)
+        pdf.cell(200, 10, txt=f"Loss History for Fold {fold + 1}:", ln=True, align='L')
+        pdf.image(plot_filename, x=10, y=None, w=190)
+        pdf.ln(85)  # Adjust this value based on the image size
+
+        # Remove the temporary plot file
+        os.remove(plot_filename)
 
     # Save the PDF
     pdf.output(report_filename)
-
     print(f"Report saved as {report_filename}")
 
 
@@ -238,8 +198,25 @@ if __name__ == '__main__':
     config = json_to_dict()
     X, y = read_data(config["data"])
     X, scalers = apply_scaling(X, config["scaling"])
-    X_train, X_test, y_train, y_test = split_data(X, y, config["training"])
-    model = build_model(config["architecture"], X_train)
-    model, history = compile_and_train(X_train, y_train, model, config["training"])
-    prepare_report(X_test, y_test, model, history)
 
+    kf = KFold(n_splits=config["cross_validation"]["n_splits"], shuffle=True, random_state=42)
+    cv_results = []
+
+    for train_index, test_index in kf.split(X):
+        X_train, X_test = X.iloc[train_index], X.iloc[test_index]
+        y_train, y_test = y.iloc[train_index], y.iloc[test_index]
+
+        model = build_model(config["architecture"], X_train.shape[1:])
+        model, history = compile_and_train(X_train, y_train, model, config["training"])
+
+        y_pred = model.predict(X_test)
+        mae = mean_absolute_error(y_test, y_pred)
+
+        cv_results.append({
+            'model': model,
+            'history': history,
+            'mae': mae
+        })
+
+    formatted_time = datetime.now().strftime("%m-%dT%H:%M")
+    prepare_report(cv_results, f'{formatted_time}_report.pdf', config)
