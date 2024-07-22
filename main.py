@@ -10,7 +10,7 @@ from keras.models import Sequential
 from keras.layers import Dense
 from keras.optimizers import Adam
 from keras.losses import MeanSquaredError
-from keras.metrics import MeanAbsoluteError
+from keras.losses import MeanAbsoluteError
 from keras.layers import Dense, Dropout, Conv2D, Flatten
 import json
 from io import BytesIO
@@ -110,13 +110,18 @@ def compile_and_train(X_train, y_train, model, tconf):
         optimizer = Adam(learning_rate=tconf["learning_rate"])
     else:
         raise ValueError(f"Unsupported optimizer: {tconf['optimizer']}")
+
     if tconf["loss"] == "mse":
         loss = MeanSquaredError()
+    elif tconf["loss"] == "mae":
+        loss = MeanAbsoluteError()
     else:
         raise ValueError(f"Unsupported loss function: {tconf['loss']}")
+
     model.compile(
-        optimizer=optimizer, loss=loss, metrics=['mse']
+        optimizer=optimizer, loss=loss, metrics=['mae', 'mse']
     )
+
     history = model.fit(
         X_train, y_train, epochs=tconf['epochs'], validation_split=tconf['validation_split'],
         batch_size=tconf['batch_size']
@@ -124,11 +129,16 @@ def compile_and_train(X_train, y_train, model, tconf):
     return model, history
 
 
-def prepare_report(cv_results, report_filename='report.pdf', config=None):
+def prepare_report(cv_results, report_filename='report.pdf', config=None, start=datetime.now()):
+    training_time = datetime.now() - start
+
     if config:
         # Get the number of splits and features from the config
         n_splits = config.get("cross_validation", {}).get("n_splits", "N/A")
         features = config.get("data", {}).get("features", "N/A")
+        loss = config.get("training", {}).get("loss", "N/A")
+        batch_size = config.get("training", {}).get("batch_size", "N/A")
+        learning_rate = config.get("training", {}).get("learning_rate", "N/A")
 
     # Calculate mean and std of absolute error
     mean_absolute_errors = [result['mae'] for result in cv_results]
@@ -148,14 +158,25 @@ def prepare_report(cv_results, report_filename='report.pdf', config=None):
         pdf.cell(200, 10, txt=f"Number of Cross-Validation Splits: {n_splits}", ln=True, align='L')
         pdf.ln(5)
         pdf.cell(200, 10, txt=f"Features Used: {', '.join(features)}", ln=True, align='L')
+        pdf.ln(5)
+        pdf.cell(200, 10, txt=f"Loss function: {loss}", ln=True, align='L')
+        pdf.ln(5)
+        pdf.cell(200, 10, txt=f"Batch size: {batch_size}", ln=True, align='L')
+        pdf.ln(5)
+        pdf.cell(200, 10, txt=f"Training time: {training_time}", ln=True, align='L')
+        pdf.ln(5)
+        pdf.cell(200, 10, txt=f"Learning rate: {learning_rate}", ln=True, align='L')
         pdf.ln(10)
 
     pdf.cell(200, 10, txt=f"Mean Absolute Error: {mean_mae:.2f} ± {std_mae:.2f}", ln=True, align='L')
     pdf.ln(10)
+    pdf.ln(10)
 
     for fold, result in enumerate(cv_results):
         history = result['history']
-        plt.figure(figsize=(10, 6))
+
+        # Create the loss plot
+        plt.figure(figsize=(5, 4))
         plt.plot(history.history['loss'], label='Train Loss')
         plt.plot(history.history['val_loss'], label='Validation Loss')
         plt.xlabel('Epochs')
@@ -165,32 +186,61 @@ def prepare_report(cv_results, report_filename='report.pdf', config=None):
         plt.grid(True)
 
         # Save the plot to a BytesIO object
-        plot_buffer = BytesIO()
-        plt.savefig(plot_buffer, format='png')
+        loss_plot_buffer = BytesIO()
+        plt.savefig(loss_plot_buffer, format='png')
         plt.close()
-        plot_buffer.seek(0)
+        loss_plot_buffer.seek(0)
+
+        # Create the scatter plot
+        y_test = result['y_test']
+        y_pred = result['y_pred']
+
+        plt.figure(figsize=(5, 4))
+        plt.scatter(y_test, y_pred, alpha=0.5, s=10)  # Smaller dots with s=10
+        plt.plot([min(y_test), max(y_test)], [min(y_test), max(y_test)], color='red')  # Add red line y=x
+        plt.xlabel('Actual Values')
+        plt.ylabel('Predicted Values')
+        plt.title(f'Predicted vs. Actual Values - Fold {fold + 1}')
+        plt.grid(True)
+
+        # Save the plot to a BytesIO object
+        scatter_plot_buffer = BytesIO()
+        plt.savefig(scatter_plot_buffer, format='png')
+        plt.close()
+        scatter_plot_buffer.seek(0)
 
         # Use PIL to open the image and save it in a compatible format for fpdf
-        image = Image.open(plot_buffer)
-        plot_filename = f'loss_history_fold_{fold + 1}.png'
-        image.save(plot_filename)
+        loss_image = Image.open(loss_plot_buffer)
+        scatter_image = Image.open(scatter_plot_buffer)
 
-        # Add the plot to the PDF
+        loss_plot_filename = f'loss_history_fold_{fold + 1}.png'
+        scatter_plot_filename = f'pred_vs_actual_fold_{fold + 1}.png'
+
+        loss_image.save(loss_plot_filename)
+        scatter_image.save(scatter_plot_filename)
+
+        # Add the plots to the PDF side by side
         pdf.add_page()
         pdf.set_font("Arial", size=12)
-        pdf.cell(200, 10, txt=f"Loss History for Fold {fold + 1}:", ln=True, align='L')
-        pdf.image(plot_filename, x=10, y=None, w=190)
-        pdf.ln(85)  # Adjust this value based on the image size
+        pdf.cell(200, 10, txt=f"Loss and Predicted vs. Actual Values - Fold {fold + 1}:", ln=True, align='L')
+        pdf.image(loss_plot_filename, x=10, y=30, w=90)
+        pdf.image(scatter_plot_filename, x=110, y=30, w=90)
+        pdf.ln(5)  # Adjust this value based on the image size
 
-        # Remove the temporary plot file
-        os.remove(plot_filename)
+        # Remove the temporary plot files
+        os.remove(loss_plot_filename)
+        os.remove(scatter_plot_filename)
 
     # Save the PDF
     pdf.output(report_filename)
     print(f"Report saved as {report_filename}")
 
+# TODO: Results of only 'f15' linear regression
+# TODO: Add results according to 'f' intervals, i.e. 10-20 m/s, 20-30 m/s, ...
 
 if __name__ == '__main__':
+    start = datetime.now()
+
     pd.set_option('display.max_columns', None)
     pd.set_option('display.width', None)
     pd.set_option('display.float_format', '{:.2f}'.format)
@@ -215,8 +265,11 @@ if __name__ == '__main__':
         cv_results.append({
             'model': model,
             'history': history,
-            'mae': mae
+            'mae': mae,
+            'y_test': y_test,
+            'y_pred': y_pred
         })
 
     formatted_time = datetime.now().strftime("%m-%dT%H:%M")
-    prepare_report(cv_results, f'{formatted_time}_report.pdf', config)
+
+    prepare_report(cv_results, f'{formatted_time}_report.pdf', config, start)

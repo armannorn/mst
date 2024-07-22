@@ -3,7 +3,7 @@
     "data": {
         "path": "Jun4_data.feather",
         "target": "f",
-        "features": ["f15", "theta15", "N2"]
+        "features": ["lat", "lon", "d15", "h_meas","f15", "theta15", "N2"]
     },
     "scaling": {
         "standard": ["f15", "theta15", "N2"],
@@ -49,11 +49,11 @@
     },
     "training": {
         "optimizer": "adam",
-        "learning_rate": 0.001,
+        "learning_rate": 0.0005,
         "loss": "mse",
-        "epochs": 10,
-        "validation_split": 0.1,
-        "test_split": 0.1,
-        "batch_size": 512
+        "epochs": 100,
+        "validation_split": 0.15,
+        "test_split": 0.15,
+        "batch_size": 128
     }
 }
