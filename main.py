@@ -4,7 +4,7 @@ import matplotlib.pyplot as plt
 from fpdf import FPDF
 from sklearn.model_selection import train_test_split, KFold
 from sklearn.preprocessing import StandardScaler, MinMaxScaler
-from sklearn.metrics import mean_absolute_error
+from sklearn.metrics import mean_absolute_error, mean_squared_error
 from tensorflow import keras
 from keras.models import Sequential
 from keras.layers import Dense
@@ -172,6 +172,31 @@ def prepare_report(cv_results, report_filename='report.pdf', config=None, start=
     pdf.ln(10)
     pdf.ln(10)
 
+    # Add layered metrics for each fold
+    for fold, result in enumerate(cv_results):
+        layered_metrics = result['layered_metrics']
+
+        pdf.add_page()
+        pdf.set_font("Arial", size=14)
+        pdf.cell(200, 10, txt=f"Layered Metrics - Fold {fold + 1}", ln=True, align='L')
+        pdf.ln(10)
+        pdf.set_font("Arial", size=12)
+
+        # Table header
+        pdf.cell(50, 10, txt="Range", border=1)
+        pdf.cell(40, 10, txt="MAE", border=1)
+        pdf.cell(40, 10, txt="MSE", border=1)
+        pdf.cell(40, 10, txt="Samples", border=1)
+        pdf.ln(10)
+
+        # Table content
+        for range_key, metrics in layered_metrics.items():
+            pdf.cell(50, 10, txt=range_key, border=1)
+            pdf.cell(40, 10, txt=f"{metrics['mae']:.2f}" if metrics['mae'] is not None else "N/A", border=1)
+            pdf.cell(40, 10, txt=f"{metrics['mse']:.2f}" if metrics['mse'] is not None else "N/A", border=1)
+            pdf.cell(40, 10, txt=str(metrics['n_samples']), border=1)
+            pdf.ln(10)
+
     for fold, result in enumerate(cv_results):
         history = result['history']
 
@@ -262,12 +287,33 @@ if __name__ == '__main__':
         y_pred = model.predict(X_test)
         mae = mean_absolute_error(y_test, y_pred)
 
+        layered_metrics = {}
+        ranges = [(0, 10), (10, 20), (20, 30), (30, 40), (40, 50), (50, float('inf'))]
+        for r in ranges:
+            mask = (y_test >= r[0]) & (y_test < r[1])
+            y_test_range = y_test[mask]
+            y_pred_range = y_pred[mask]
+
+            if len(y_test_range) > 0:
+                range_mae = mean_absolute_error(y_test_range, y_pred_range)
+                range_mse = mean_squared_error(y_test_range, y_pred_range)
+            else:
+                range_mae = None
+                range_mse = None
+
+            layered_metrics[f'{r[0]}-{r[1]}'] = {
+                'mae': range_mae,
+                'mse': range_mse,
+                'n_samples': len(y_test_range)
+            }
+
         cv_results.append({
             'model': model,
             'history': history,
             'mae': mae,
             'y_test': y_test,
-            'y_pred': y_pred
+            'y_pred': y_pred,
+            'layered_metrics': layered_metrics
         })
 
     formatted_time = datetime.now().strftime("%m-%dT%H:%M")

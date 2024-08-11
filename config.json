@@ -51,7 +51,7 @@
         "optimizer": "adam",
         "learning_rate": 0.0005,
         "loss": "mse",
-        "epochs": 100,
+        "epochs": 10,
         "validation_split": 0.15,
         "test_split": 0.15,
         "batch_size": 128
