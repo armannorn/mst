@@ -36,6 +36,15 @@ def json_to_dict(path="config.json"):
 
 def read_data(dconf: dict[str, any]) -> (pd.DataFrame, pd.Series):
     df = pd.read_feather(dconf["path"])
+
+    # Fix elevation
+    e_columns = [col for col in df.columns if col.startswith('e')]
+    overall_min = df[e_columns].min().min()
+    df[e_columns] = df[e_columns].apply(lambda col: col.fillna(overall_min), axis=0)
+
+    # Optionally, display the updated DataFrame
+    print(df.head())
+
     missing_features = [feature for feature in dconf["features"] if feature in df.columns]
     if dconf["target"] in df.columns and missing_features:
         X = df[dconf["features"]]

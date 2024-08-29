@@ -1,13 +1,13 @@
 {
     "cross_validation": {"n_splits":  2},
     "data": {
-        "path": "Jun4_data.feather",
+        "path": "Xy_28August.feather",
         "target": "f",
-        "features": ["lat", "lon", "d15", "h_meas","f15", "theta15", "N2"]
+        "features": ["lat", "lon", "d15", "h_meas","f15", "theta15", "N2", "e0", "e1", "e2"]
     },
     "scaling": {
         "standard": ["f15", "theta15", "N2"],
-        "minmax": ["lat", "lon", "h_meas"],
+        "minmax": ["lat", "lon", "h_meas", "e0", "e1", "e2"],
         "circular": ["d15"]
     },
     "architecture": {
@@ -51,7 +51,7 @@
         "optimizer": "adam",
         "learning_rate": 0.0005,
         "loss": "mse",
-        "epochs": 10,
+        "epochs": 200,
         "validation_split": 0.15,
         "test_split": 0.15,
         "batch_size": 128
