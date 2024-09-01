@@ -1,13 +1,13 @@
 {
     "cross_validation": {"n_splits":  2},
     "data": {
-        "path": "Xy_28August.feather",
+        "path": "data_1Sep2.feather",
         "target": "f",
-        "features": ["lat", "lon", "d15", "h_meas","f15", "theta15", "N2", "e0", "e1", "e2"]
+        "features": ["f15", "theta15", "N2", "lat", "lon", "h_meas","d15", "e0.0", "e0.5", "e2.0", "e4.5", "e8.0", "e12.5", "e18.0", "e24.5", "e32.0", "e_std"]
     },
     "scaling": {
         "standard": ["f15", "theta15", "N2"],
-        "minmax": ["lat", "lon", "h_meas", "e0", "e1", "e2"],
+        "minmax": ["lat", "lon", "h_meas", "e0.0", "e0.5", "e2.0", "e4.5", "e8.0", "e12.5", "e18.0", "e24.5", "e32.0", "station_ri", "e_std"],
         "circular": ["d15"]
     },
     "architecture": {
@@ -50,10 +50,12 @@
     "training": {
         "optimizer": "adam",
         "learning_rate": 0.0005,
-        "loss": "mse",
-        "epochs": 200,
+        "loss": "mae",
+        "epochs": 100,
         "validation_split": 0.15,
         "test_split": 0.15,
         "batch_size": 128
-    }
+    },
+    "note": "all+STATION_RI",
+    "png_name": true
 }

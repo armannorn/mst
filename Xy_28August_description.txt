@@ -1,0 +1,10 @@
+Length: 1,152,615
+
+Columns
+
+- Lat, lon, h_meas: Location, Height of weather station
+- d15, f15, theta15: predicted Wind direction, wind speed, potential temperature
+- N2: Brunt-Vaisala frequency according to CARRA
+- e<digits>: Elevation in <digits> kilometers upwind
+- n_e: Number of elevation points to sea, a heuristic for distance from sea
+- f: Real measurement of wind speed

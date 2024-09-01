@@ -19,6 +19,7 @@ import os
 import logging
 import time
 from datetime import datetime
+import sys
 
 
 def json_to_dict(path="config.json"):
@@ -38,12 +39,10 @@ def read_data(dconf: dict[str, any]) -> (pd.DataFrame, pd.Series):
     df = pd.read_feather(dconf["path"])
 
     # Fix elevation
-    e_columns = [col for col in df.columns if col.startswith('e')]
+    e_columns = [col for col in df.columns if col.startswith('e') and col[1].isdigit()]
     overall_min = df[e_columns].min().min()
     df[e_columns] = df[e_columns].apply(lambda col: col.fillna(overall_min), axis=0)
-
-    # Optionally, display the updated DataFrame
-    print(df.head())
+    df["e_std"] = df["e_std"].fillna(0.0)
 
     missing_features = [feature for feature in dconf["features"] if feature in df.columns]
     if dconf["target"] in df.columns and missing_features:
@@ -136,6 +135,110 @@ def compile_and_train(X_train, y_train, model, tconf):
         batch_size=tconf['batch_size']
     )
     return model, history
+
+
+def log_results(cv_results, config=None, start=datetime.now(), note=""):
+    training_time = datetime.now() - start
+
+    # Get features from config
+    n_splits = config.get("cross_validation", {}).get("n_splits", "N/A")
+    features = config.get("data", {}).get("features", "N/A")
+    loss = config.get("training", {}).get("loss", "N/A")
+    batch_size = config.get("training", {}).get("batch_size", "N/A")
+    learning_rate = config.get("training", {}).get("learning_rate", "N/A")
+    n_epochs = config.get("training", {}).get("epochs", "N/A")
+    dataset = config.get("data", {}).get("path", "N/A").split('.')[0]
+    note = config.get("note", "N/A")
+    timestamp = start.strftime("%d-%m-%YT%H:%M:%S")
+
+    # Calculate mean and std of absolute error
+    mean_absolute_errors = [result['mae'] for result in cv_results]
+    mean_mae = np.mean(mean_absolute_errors)
+    std_mae = np.std(mean_absolute_errors)
+
+    dictionary = {
+        "timestamp": timestamp,
+        "mae_avg": np.round(mean_mae, 2),
+        "mae_std": np.round(std_mae, 2),
+    }
+
+    ranges = [(0, 10), (10, 20), (20, 30), (30, 40), (40, 50), (50, float('inf'))]
+    keys = [f'{r[0]}-{r[1]}' for r in ranges]
+    combined_layered_metrics = [split["layered_metrics"] for split in cv_results]
+
+    dictionary.update({
+        f"mae_{key}": np.round(
+            np.mean([clm[key]['mae'] for clm in combined_layered_metrics])
+        ) for key in keys
+    })
+
+    dictionary.update({
+        'n_splits': n_splits, 'epochs': n_epochs, 'training_time': training_time, 'loss': loss,
+        'batch_size': batch_size, 'learning_rate': learning_rate, 'n_features': len(features),
+        'features': ' '.join(features), 'dataset': dataset, 'note': note
+    })
+
+    try:
+        previous_logs = pd.read_csv('logs.csv')
+        new_logs = pd.concat([previous_logs, pd.DataFrame([dictionary])], axis=0, ignore_index=True)
+
+    except Exception as e:
+        new_logs = pd.DataFrame([dictionary])
+
+    new_logs.to_csv('logs.csv', index=False)
+
+    # Assuming 'cv_results' is already defined earlier in your code
+    num_folds = len(cv_results)
+    num_rows = int(np.ceil(num_folds / 2)) * 2 # Calculate the number of rows needed
+
+    # Create a figure for subplots
+    fig, axes = plt.subplots(num_rows, 2, figsize=(15, num_rows * 5))
+
+    # If there's only one row, `axes` will not be a 2D array, so we need to make sure it's always treated as 2D.
+    if num_rows == 1:
+        axes = np.expand_dims(axes, axis=0)
+
+    # Flatten the axes array for easy iteration
+    axes = axes.flatten()
+
+    for fold, result in enumerate(cv_results):
+        history = result['history']
+
+        # Select the appropriate subplot for the loss plot
+        ax_loss = axes[2 * fold]
+        ax_loss.plot(history.history['loss'], label='Train Loss')
+        ax_loss.plot(history.history['val_loss'], label='Validation Loss')
+        ax_loss.set_xlabel('Epochs')
+        ax_loss.set_ylabel('Loss')
+        ax_loss.set_title(f'Training and Validation Loss History - Fold {fold + 1}')
+        ax_loss.legend()
+        ax_loss.grid(True)
+
+        # Select the appropriate subplot for the scatter plot
+        ax_scatter = axes[2 * fold + 1]
+        y_test = result['y_test']
+        y_pred = result['y_pred']
+        ax_scatter.scatter(y_test, y_pred, alpha=0.5, s=10)
+        ax_scatter.plot([min(y_test), max(y_test)], [min(y_test), max(y_test)], color='red')  # Add red line y=x
+        ax_scatter.set_xlabel('Actual Values')
+        ax_scatter.set_ylabel('Predicted Values')
+        ax_scatter.set_title(f'Predicted vs. Actual Values - Fold {fold + 1}')
+        ax_scatter.grid(True)
+
+    # Remove any empty subplots if the number of folds is odd
+    if num_folds % 2 != 0:
+        fig.delaxes(axes[-1])
+
+    # Adjust layout to avoid overlap
+    plt.tight_layout()
+
+    if config.get("png_name") and note:
+        combined_plot_filename = f"{os.path.join('figures', note+timestamp)}.png"
+    else:
+        combined_plot_filename = f"{os.path.join('figures', timestamp)}.png"
+
+    plt.savefig(combined_plot_filename, format='png')
+    plt.close()
 
 
 def prepare_report(cv_results, report_filename='report.pdf', config=None, start=datetime.now()):
@@ -269,10 +372,8 @@ def prepare_report(cv_results, report_filename='report.pdf', config=None, start=
     pdf.output(report_filename)
     print(f"Report saved as {report_filename}")
 
-# TODO: Results of only 'f15' linear regression
-# TODO: Add results according to 'f' intervals, i.e. 10-20 m/s, 20-30 m/s, ...
 
-if __name__ == '__main__':
+def main():
     start = datetime.now()
 
     pd.set_option('display.max_columns', None)
@@ -325,6 +426,11 @@ if __name__ == '__main__':
             'layered_metrics': layered_metrics
         })
 
-    formatted_time = datetime.now().strftime("%m-%dT%H:%M")
+    log_results(cv_results, config, start)
 
-    prepare_report(cv_results, f'{formatted_time}_report.pdf', config, start)
+
+if __name__ == '__main__':
+    main()
+
+
+    # prepare_report(cv_results, f'{formatted_time}_report.pdf', config, start)
