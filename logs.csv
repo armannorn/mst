@@ -1,25 +1,10 @@
-timestamp,mae_avg,mae_std,mae_0-10,mae_10-20,mae_20-30,mae_30-40,mae_40-50,mae_50-inf,n_splits,epochs,training_time,loss,batch_size,learning_rate,n_features,features,dataset,note
-01-09-2024T13:08:21,1.92,0.0,2.0,3.0,6.0,11.0,19.0,26.0,2,1,0 days 00:00:22.442436,mse,128,0.0005,10,lat lon d15 h_meas f15 theta15 N2 e0 e1 e2,Xy_28August,Feature experiments
-01-09-2024T13:14:37,1.92,0.0,2.0,3.0,6.0,11.0,18.0,25.0,2,1,0 days 00:00:22.234071,mse,128,0.0005,10,lat lon d15 h_meas f15 theta15 N2 e0 e1 e2,Xy_28August,Feature experiments
-01-09-2024T13:16:43,1.93,0.01,2.0,3.0,7.0,12.0,20.0,27.0,2,1,0 days 00:00:22.024660,mse,128,0.0005,10,lat lon d15 h_meas f15 theta15 N2 e0 e1 e2,Xy_28August,Feature experiments
-01-09-2024T13:21:42,1.94,0.0,2.0,3.0,7.0,13.0,21.0,28.0,2,1,0 days 00:00:22.233221,mse,128,0.0005,10,lat lon d15 h_meas f15 theta15 N2 e0 e1 e2,Xy_28August,Feature experiments
-01-09-2024T13:22:30,1.93,0.01,2.0,3.0,6.0,11.0,19.0,26.0,2,1,0 days 00:00:22.131843,mse,128,0.0005,10,lat lon d15 h_meas f15 theta15 N2 e0 e1 e2,Xy_28August,Feature experiments
-01-09-2024T13:25:31,1.85,0.02,2.0,3.0,5.0,9.0,15.0,20.0,2,10,0 days 00:01:39.585234,mse,128,0.0005,10,lat lon d15 h_meas f15 theta15 N2 e0 e1 e2,Xy_28August,Feature experiments
-01-09-2024T13:28:03,1.7,0.0,1.0,3.0,5.0,8.0,14.0,18.0,2,100,0 days 00:14:41.790651,mae,128,0.0005,10,lat lon d15 h_meas f15 theta15 N2 e0 e1 e2,Xy_28August,Loss experiments #2
-01-09-2024T13:44:05,1.73,0.0,2.0,2.0,4.0,8.0,12.0,16.0,2,100,0 days 00:14:27.900830,mse,128,0.0005,10,lat lon d15 h_meas f15 theta15 N2 e0 e1 e2,Xy_28August,Loss experiments #2
-01-09-2024T14:10:04,2.08,0.0,2.0,3.0,8.0,16.0,25.0,34.0,2,100,0 days 00:14:15.850730,mae,128,0.0005,1,f15,Xy_28August,Loss experiments #2
-01-09-2024T14:38:09,1.82,0.0,2.0,3.0,5.0,9.0,15.0,21.0,2,100,0 days 00:14:17.464786,mae,128,0.0005,4,f15 lat lon h_meas,Xy_28August,"Loss experiments #2, loc+f_pred"
-01-09-2024T15:16:51,2.07,0.0,2.0,3.0,7.0,15.0,24.0,32.0,2,100,0 days 00:15:14.570522,mae,128,0.0005,4,f15 theta15 N2 d15,Xy_28August,"Loss experiments #2, carra_pred"
-01-09-2024T15:43:00,1.72,0.0,1.0,3.0,5.0,9.0,15.0,20.0,2,100,0 days 00:14:51.510393,mae,128,0.0005,7,f15 theta15 N2 d15 lat lon h_meas,Xy_28August,"Loss experiments #2, carra_pred+location"
-01-09-2024T16:04:00,1.88,0.0,2.0,3.0,5.0,9.0,16.0,23.0,2,100,0 days 00:14:43.382343,mae,128,0.0005,4,f15 e0 e1 e2,Xy_28August,"Loss experiments #2, carra_pred+elevation(<=4)"
-01-09-2024T18:00:45,1.81,0.0,2.0,3.0,5.0,9.0,14.0,20.0,2,100,0 days 00:14:43.047451,mae,128,0.0005,8,f15 e0 e1 e2 e4 e8 e16 e32,Xy_28August,"Loss experiments #2, carra_pred+elevation(<=32)"
-01-09-2024T18:21:53,1.78,0.0,2.0,3.0,5.0,8.0,13.0,18.0,2,100,0 days 00:14:38.802094,mae,128,0.0005,12,f15 e0 e1 e2 e4 e8 e16 e32 e64 e128 e256 e512,Xy_28August,"Loss experiments #2, carra_pred+elevation(all)"
-01-09-2024T18:56:06,1.72,0.0,2.0,2.0,5.0,8.0,13.0,18.0,2,100,0 days 00:15:15.568396,mae,128,0.0005,15,f15 lat lon h_meas e0 e1 e2 e4 e8 e16 e32 e64 e128 e256 e512,Xy_28August,"Loss experiments #2, carra_pred+elevation(all)+location"
-01-09-2024T19:23:06,1.76,0.0,2.0,3.0,5.0,8.0,13.0,18.0,2,100,0 days 00:14:48.962481,mae,128,0.0005,15,f15 N2 d15 theta15 e0 e1 e2 e4 e8 e16 e32 e64 e128 e256 e512,Xy_28August,"Loss experiments #2, carra_pred(all)+elevation(all)"
-01-09-2024T19:38:59,1.71,0.01,1.0,3.0,5.0,9.0,14.0,19.0,2,100,0 days 00:14:43.653625,mae,128,0.0005,18,f15 N2 d15 theta15 lat lon h_meas e0 e1 e2 e4 e8 e16 e32 e64 e128 e256 e512,Xy_28August,"Loss experiments #2, carra_pred(all)+elevation(all)+location(all)"
-01-09-2024T20:13:50,1.79,0.0,2.0,3.0,5.0,8.0,14.0,19.0,2,100,0 days 00:14:36.979815,mae,128,0.0005,10,f15 e0.0 e0.5 e2.0 e4.5 e8.0 e12.5 e18.0 e24.5 e32.0,data_1Sep,f_pred+elevation(tight)
-01-09-2024T20:57:38,1.69,0.0,2.0,2.0,4.0,7.0,12.0,18.0,2,100,0 days 00:14:52.028918,mae,128,0.0005,16,f15 theta15 N2 lat lon h_meas d15 e0.0 e0.5 e2.0 e4.5 e8.0 e12.5 e18.0 e24.5 e32.0,data_1Sep,f_pred+elevation(tight)+location(all)+carra(all)
-01-09-2024T21:23:17,1.88,0.0,2.0,3.0,6.0,12.0,21.0,29.0,2,1,0 days 00:00:22.457456,mae,128,0.0005,17,f15 theta15 N2 lat lon h_meas d15 e0.0 e0.5 e2.0 e4.5 e8.0 e12.5 e18.0 e24.5 e32.0 station_ri,data_1Sep2,all+STATION_RI
-01-09-2024T21:24:05,1.81,0.0,2.0,3.0,6.0,11.0,19.0,25.0,2,5,0 days 00:00:56.714810,mae,128,0.0005,17,f15 theta15 N2 lat lon h_meas d15 e0.0 e0.5 e2.0 e4.5 e8.0 e12.5 e18.0 e24.5 e32.0 station_ri,data_1Sep2,all+STATION_RI
-01-09-2024T21:27:58,1.69,0.0,1.0,2.0,5.0,8.0,14.0,19.0,2,100,0 days 00:14:50.303845,mae,128,0.0005,17,f15 theta15 N2 lat lon h_meas d15 e0.0 e0.5 e2.0 e4.5 e8.0 e12.5 e18.0 e24.5 e32.0 station_ri,data_1Sep2,all+STATION_RI
-01-09-2024T21:46:40,1.69,0.0,1.0,2.0,5.0,8.0,13.0,18.0,2,100,0 days 00:14:46.932395,mae,128,0.0005,17,f15 theta15 N2 lat lon h_meas d15 e0.0 e0.5 e2.0 e4.5 e8.0 e12.5 e18.0 e24.5 e32.0 e_std,data_1Sep2,all+STATION_RI
+timestamp,mae_avg,mae_std,mae_0-10,mae_10-20,mae_20-30,mae_30-inf,n_splits,epochs,training_time,loss,batch_size,learning_rate,n_features,features,dataset,note
+22-09-2024T20:56:32,2.14,0.0,2.0,3.0,8.0,17.0,2,100,0 days 00:15:26.634874,mae,128,0.0005,4,f15,21Sep,f15
+22-09-2024T22:36:05,2.09,0.0,2.0,3.0,7.0,15.0,2,100,0 days 00:15:58.239427,mae,128,0.0005,4,f15+p+t,21Sep,f15+p15+t15
+22-09-2024T23:02:50,2.13,0.0,2.0,3.0,8.0,16.0,2,100,0 days 00:15:19.877047,mae,128,0.0005,4,f15+theta15,21Sep,f15+theta15
+22-09-2024T23:27:08,2.08,0.0,2.0,3.0,7.0,15.0,2,100,0 days 00:15:41.069573,mae,128,0.0005,4,"f15, p15, t15, N2",21Sep,pred+N2
+22-09-2024T23:44:03,1.87,0.01,2.0,3.0,5.0,9.0,2,100,0 days 00:15:37.576207,mae,128,0.0005,4,"lat, lon, h_meas, f15",21Sep,f15+location
+23-09-2024T00:06:47,3.08,0.0,2.0,6.0,15.0,25.0,2,100,0 days 00:15:32.851388,mae,128,0.0005,4,", elevation",21Sep,elevation only
+23-09-2024T00:30:39,1.84,0.0,2.0,3.0,5.0,9.0,2,100,0 days 00:15:30.110946,mae,128,0.0005,4,"f15, elevation",21Sep,f15+elevation
+23-09-2024T00:50:56,1.76,0.01,2.0,2.0,5.0,8.0,2,100,0 days 00:15:50.235149,mae,128,0.0005,4,"lat, lon, h_meas, f15, p15, t15, elevation, N2",21Sep,f15+pred+elevation+location
+23-09-2024T01:09:56,1.75,0.01,2.0,3.0,5.0,9.0,2,100,0 days 00:15:12.141226,mae,128,0.0005,4,"lat, lon, h_meas, f15, p15, t15, elevation, N2, ocean_wind, TRI",21Sep,f15+pred+elevation+location+extra

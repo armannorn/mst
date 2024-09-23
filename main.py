@@ -1,3 +1,5 @@
+import colorama.win32
+import colorcet.plotting
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
@@ -21,7 +23,6 @@ import time
 from datetime import datetime
 import sys
 
-
 def json_to_dict(path="config.json"):
     try:
         with open(path, 'r') as file:
@@ -35,18 +36,46 @@ def json_to_dict(path="config.json"):
         print(f"An unexpected error occurred: {e}")
 
 
+def resolve_columns(df: pd.DataFrame, fconf: dict[str, any]) -> list[str]:
+    r: list[str] = []
+    var_cols = fconf.get("various")
+    pred_cols = fconf.get("predictions")
+    max_e = fconf.get("elevation")
+
+    if fconf.get("location"):
+        loc_cols = ["lat", "lon", "h_meas"]
+        r += [col for col in loc_cols if col in df.columns]
+
+    if pred_cols:
+        r += [col for col in pred_cols if col in df.columns]
+
+    if max_e:
+        e_cols = [col for col in df.columns if col.startswith("e") and len(col) >= 2 and col[1].isdigit()]
+        for col in e_cols:
+            if int(col[1:]) < max_e:
+                r += [col]
+
+    if var_cols:
+        r += [col for col in var_cols if col in df.columns]
+
+    return r
+
+
 def read_data(dconf: dict[str, any]) -> (pd.DataFrame, pd.Series):
     df = pd.read_feather(dconf["path"])
-
     # Fix elevation
     e_columns = [col for col in df.columns if col.startswith('e') and col[1].isdigit()]
     overall_min = df[e_columns].min().min()
     df[e_columns] = df[e_columns].apply(lambda col: col.fillna(overall_min), axis=0)
-    df["e_std"] = df["e_std"].fillna(0.0)
 
-    missing_features = [feature for feature in dconf["features"] if feature in df.columns]
-    if dconf["target"] in df.columns and missing_features:
-        X = df[dconf["features"]]
+    if "TRI" in df.columns:
+        df["TRI"] = df["TRI"].fillna(0.0)
+
+    # Which columns are in X
+    cols = resolve_columns(df, dconf["features"])
+
+    if dconf["target"] in df.columns:
+        X = df[cols]
         y = df[dconf["target"]]
         return X, y
     else:
@@ -54,10 +83,15 @@ def read_data(dconf: dict[str, any]) -> (pd.DataFrame, pd.Series):
 
 
 def apply_scaling(X: pd.DataFrame, sconf: dict) -> (pd.DataFrame, dict):
+
     scalers = {}
     if sconf.get('standard'):
         standard_scaler = StandardScaler()
-        standard_cols = sconf['standard']
+        standard_cols = sconf["standard"]
+        if "predictions" in standard_cols:
+            standard_cols.remove("predictions")
+            standard_cols += ["f15", "p15", "t15", "theta15"]
+
         for col in standard_cols:
             if col in X.columns:
                 X[col] = standard_scaler.fit_transform(X[col].to_numpy().reshape(-1, 1))
@@ -67,10 +101,21 @@ def apply_scaling(X: pd.DataFrame, sconf: dict) -> (pd.DataFrame, dict):
     if sconf.get('minmax'):
         minmax_scaler = MinMaxScaler()
         minmax_cols = sconf['minmax']
+
+        if "location" in minmax_cols:
+            minmax_cols.remove("location")
+            minmax_cols += ["lat", "lon", "h_meas"]
+
+        if "elevation" in minmax_cols:
+            minmax_cols.remove("elevation")
+            minmax_cols += [col for col in X.columns if col.startswith("e")]
+
         for col in minmax_cols:
             if col in X.columns:
                 X[col] = minmax_scaler.fit_transform(X[col].to_numpy().reshape(-1,1))
+
         scalers['minmax'] = minmax_scaler
+
     if sconf.get('circular'):
         for col in sconf['circular']:
             if col in X.columns:
@@ -137,6 +182,24 @@ def compile_and_train(X_train, y_train, model, tconf):
     return model, history
 
 
+def prepare_features(features):
+    s = ""
+    if features.get("location"):
+        s += "lat, lon, h_meas"
+
+    if features.get("predictions"):
+        s += ", " if len(s) > 0 else ""
+        s += ', '.join(features["predictions"])
+
+    if features.get("elevation"):
+        s += ", elevation"
+
+    if features.get("various"):
+        s += ", " if len(s) > 0 else ""
+        s += ', '.join(features["various"])
+
+    return s
+
 def log_results(cv_results, config=None, start=datetime.now(), note=""):
     training_time = datetime.now() - start
 
@@ -162,7 +225,7 @@ def log_results(cv_results, config=None, start=datetime.now(), note=""):
         "mae_std": np.round(std_mae, 2),
     }
 
-    ranges = [(0, 10), (10, 20), (20, 30), (30, 40), (40, 50), (50, float('inf'))]
+    ranges = [(0, 10), (10, 20), (20, 30), (30, float('inf'))]
     keys = [f'{r[0]}-{r[1]}' for r in ranges]
     combined_layered_metrics = [split["layered_metrics"] for split in cv_results]
 
@@ -172,10 +235,12 @@ def log_results(cv_results, config=None, start=datetime.now(), note=""):
         ) for key in keys
     })
 
+    feature_string = prepare_features(features)
+
     dictionary.update({
         'n_splits': n_splits, 'epochs': n_epochs, 'training_time': training_time, 'loss': loss,
         'batch_size': batch_size, 'learning_rate': learning_rate, 'n_features': len(features),
-        'features': ' '.join(features), 'dataset': dataset, 'note': note
+        'features': feature_string, 'dataset': dataset, 'note': note
     })
 
     try:
@@ -398,7 +463,7 @@ def main():
         mae = mean_absolute_error(y_test, y_pred)
 
         layered_metrics = {}
-        ranges = [(0, 10), (10, 20), (20, 30), (30, 40), (40, 50), (50, float('inf'))]
+        ranges = [(0, 10), (10, 20), (20, 30), (30, float('inf'))]
         for r in ranges:
             mask = (y_test >= r[0]) & (y_test < r[1])
             y_test_range = y_test[mask]
