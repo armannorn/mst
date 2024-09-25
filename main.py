@@ -231,7 +231,7 @@ def log_results(cv_results, config=None, start=datetime.now(), note=""):
 
     dictionary.update({
         f"mae_{key}": np.round(
-            np.mean([clm[key]['mae'] for clm in combined_layered_metrics])
+            np.mean([clm[key]['mae'] for clm in combined_layered_metrics]), 3
         ) for key in keys
     })
 

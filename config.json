@@ -8,7 +8,7 @@
             "location": true,
             "predictions": ["f15", "p15", "t15"],
             "elevation": 20000,
-            "various": ["N2", "ocean_wind", "TRI"]
+            "various": ["N2", "TRI", "ocean_wind"]
         }
     },
     "scaling": {
@@ -61,6 +61,6 @@
         "test_split": 0.15,
         "batch_size": 128
     },
-    "note": "f15+pred+elevation+location+extra",
+    "note": "f15+elevation+location+extra",
     "png_name": true
 }
