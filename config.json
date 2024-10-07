@@ -1,25 +1,27 @@
 {
-    "cross_validation": {"n_splits":  2},
+    "cross_validation": {"n_splits":  3},
     "data": {
-        "path": "21Sep.feather",
+        "path": "5oct.feather",
+        "utility": 1,
         "target": "f",
         "features":
         {
             "location": true,
             "predictions": ["f15", "p15", "t15"],
-            "elevation": 20000,
-            "various": ["N2", "TRI", "ocean_wind"]
+            "elevation": 0,
+            "stations": false,
+            "various": []
         }
     },
     "scaling": {
         "standard": ["predictions", "N2"],
-        "minmax": ["location", "elevation", "TRI"]
+        "minmax": ["location", "elevation", "TRI", "min_dist_to_ocean"]
     },
     "architecture": {
         "layers": [
             {
                 "type": "dense",
-                "units": 128,
+                "units": 256,
                 "activation": "relu"
             },
             {
@@ -28,7 +30,7 @@
             },
             {
                 "type": "dense",
-                "units": 128,
+                "units": 256,
                 "activation": "relu"
             },
             {
@@ -37,7 +39,7 @@
             },
             {
                 "type": "dense",
-                "units": 128,
+                "units": 256,
                 "activation": "relu"
             },
             {
@@ -45,8 +47,8 @@
                 "rate": 0.1
             },
             {
-                "type": "Dense",
-                "units": 128,
+                "type": "dense",
+                "units": 256,
                 "activation": "linear"
             }
         ],
@@ -59,8 +61,14 @@
         "epochs": 100,
         "validation_split": 0.15,
         "test_split": 0.15,
-        "batch_size": 128
+        "batch_size": 128,
+        "early_stopping": {
+            "use": true,
+            "patience": 10,
+            "verbose": 1,
+            "restore": true
+        }
     },
-    "note": "f15+elevation+location+extra",
+    "note": "baseline+pred+location",
     "png_name": true
 }

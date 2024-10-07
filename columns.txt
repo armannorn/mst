@@ -1,0 +1,16 @@
+time - time in datetime64
+lat, lon - latitude and longitude to 1 decimal
+height_ASL - height of weather station above sea level
+d<m> - pred wind direction at height <m>
+f<m> - pred wind speed at height <m>
+p<m> - pred pressure at height <m>
+t<m> - pred tempt. at height <m>
+theta<m> - pred potential tempt. at height <m>
+xy - ISN93 coordinates
+e<m> - elevation <m> meters upwind
+N2 - Brunt-Vaisala frequency based on predicted values at 15 m and 100 m heights
+ocean_wind_indicator - approximation of whether wind comes from sea or over land. -1 if land, 1 if sea
+TRI - terrain roughness index
+min_dist_to_ocean - minimum distance to ocean
+
+f - actual measured average wind speed

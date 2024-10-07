@@ -7,6 +7,7 @@ from fpdf import FPDF
 from sklearn.model_selection import train_test_split, KFold
 from sklearn.preprocessing import StandardScaler, MinMaxScaler
 from sklearn.metrics import mean_absolute_error, mean_squared_error
+
 from tensorflow import keras
 from keras.models import Sequential
 from keras.layers import Dense
@@ -14,6 +15,9 @@ from keras.optimizers import Adam
 from keras.losses import MeanSquaredError
 from keras.losses import MeanAbsoluteError
 from keras.layers import Dense, Dropout, Conv2D, Flatten
+
+from keras.callbacks import EarlyStopping
+
 import json
 from io import BytesIO
 from PIL import Image
@@ -22,6 +26,7 @@ import logging
 import time
 from datetime import datetime
 import sys
+
 
 def json_to_dict(path="config.json"):
     try:
@@ -41,6 +46,7 @@ def resolve_columns(df: pd.DataFrame, fconf: dict[str, any]) -> list[str]:
     var_cols = fconf.get("various")
     pred_cols = fconf.get("predictions")
     max_e = fconf.get("elevation")
+    stations_in = fconf.get("stations")
 
     if fconf.get("location"):
         loc_cols = ["lat", "lon", "h_meas"]
@@ -58,11 +64,19 @@ def resolve_columns(df: pd.DataFrame, fconf: dict[str, any]) -> list[str]:
     if var_cols:
         r += [col for col in var_cols if col in df.columns]
 
+    if stations_in:
+        r += [col for col in df.columns if col.startswith("station") and col != "station"]
+
     return r
 
 
 def read_data(dconf: dict[str, any]) -> (pd.DataFrame, pd.Series):
+    data_utility = dconf["utility"]
     df = pd.read_feather(dconf["path"])
+
+    if data_utility < 1:
+        df = df.sample(frac=data_utility, random_state=42)
+
     # Fix elevation
     e_columns = [col for col in df.columns if col.startswith('e') and col[1].isdigit()]
     overall_min = df[e_columns].min().min()
@@ -70,6 +84,9 @@ def read_data(dconf: dict[str, any]) -> (pd.DataFrame, pd.Series):
 
     if "TRI" in df.columns:
         df["TRI"] = df["TRI"].fillna(0.0)
+
+    if dconf["features"].get("stations"):
+        df = ohe_stations(df)
 
     # Which columns are in X
     cols = resolve_columns(df, dconf["features"])
@@ -80,6 +97,15 @@ def read_data(dconf: dict[str, any]) -> (pd.DataFrame, pd.Series):
         return X, y
     else:
         return "Error. Target or features not in dataset."
+
+
+def ohe_stations(df):
+    if "station" in df.columns:
+        df["station"] = df["station"].apply(lambda x: str(int(x)))
+        one_hot_df = pd.get_dummies(df['station'], prefix='station').astype(float)
+        df = pd.concat([df, one_hot_df], axis=1)
+
+    return df
 
 
 def apply_scaling(X: pd.DataFrame, sconf: dict) -> (pd.DataFrame, dict):
@@ -104,7 +130,7 @@ def apply_scaling(X: pd.DataFrame, sconf: dict) -> (pd.DataFrame, dict):
 
         if "location" in minmax_cols:
             minmax_cols.remove("location")
-            minmax_cols += ["lat", "lon", "h_meas"]
+            minmax_cols += ["lat", "lon", "height_ASL"]
 
         if "elevation" in minmax_cols:
             minmax_cols.remove("elevation")
@@ -159,6 +185,18 @@ def build_model(aconf, input_shape):
 
 
 def compile_and_train(X_train, y_train, model, tconf):
+    # Define early stopping
+    if tconf["early_stopping"]["use"]:
+        esconf = tconf["early_stopping"]
+        early_stopping = EarlyStopping(
+            monitor='val_loss',  # Metric to monitor (e.g., validation loss)
+            patience=esconf["patience"],  # Number of epochs to wait after last improvement
+            verbose=esconf["verbose"],  # Verbose output when stopping
+            restore_best_weights=esconf["restore"]  # Restore model weights from the epoch with the best validation loss
+        )
+    else:
+        early_stopping = None
+
     if tconf["optimizer"] == "adam":
         optimizer = Adam(learning_rate=tconf["learning_rate"])
     else:
@@ -172,12 +210,12 @@ def compile_and_train(X_train, y_train, model, tconf):
         raise ValueError(f"Unsupported loss function: {tconf['loss']}")
 
     model.compile(
-        optimizer=optimizer, loss=loss, metrics=['mae', 'mse']
+        optimizer=optimizer, loss=loss, metrics=['mae']
     )
 
     history = model.fit(
         X_train, y_train, epochs=tconf['epochs'], validation_split=tconf['validation_split'],
-        batch_size=tconf['batch_size']
+        batch_size=tconf['batch_size'], callbacks=[early_stopping]
     )
     return model, history
 
@@ -185,7 +223,7 @@ def compile_and_train(X_train, y_train, model, tconf):
 def prepare_features(features):
     s = ""
     if features.get("location"):
-        s += "lat, lon, h_meas"
+        s += "lat, lon, height_ASL"
 
     if features.get("predictions"):
         s += ", " if len(s) > 0 else ""
@@ -199,6 +237,7 @@ def prepare_features(features):
         s += ', '.join(features["various"])
 
     return s
+
 
 def log_results(cv_results, config=None, start=datetime.now(), note=""):
     training_time = datetime.now() - start
@@ -216,13 +255,19 @@ def log_results(cv_results, config=None, start=datetime.now(), note=""):
 
     # Calculate mean and std of absolute error
     mean_absolute_errors = [result['mae'] for result in cv_results]
+    min_val_losses = [result['mae'] for result in cv_results]
+    epochs = [result['n_epochs'] for result in cv_results]
     mean_mae = np.mean(mean_absolute_errors)
     std_mae = np.std(mean_absolute_errors)
+    min_epoch = min(epochs)
 
     dictionary = {
         "timestamp": timestamp,
-        "mae_avg": np.round(mean_mae, 2),
-        "mae_std": np.round(std_mae, 2),
+        "min_n_epoch": min_epoch,
+        "min_val_loss_avg": np.round(np.mean(min_val_losses), 3),
+        "min_val_loss_std": np.round(np.std(min_val_losses), 3),
+        "test_mae_avg": np.round(mean_mae, 3),
+        "test_mae_std": np.round(std_mae, 3),
     }
 
     ranges = [(0, 10), (10, 20), (20, 30), (30, float('inf'))]
@@ -269,6 +314,13 @@ def log_results(cv_results, config=None, start=datetime.now(), note=""):
     for fold, result in enumerate(cv_results):
         history = result['history']
 
+        # Get validation loss history
+        val_loss = history.history['val_loss']
+
+        # Find the epoch with the minimum validation loss
+        min_val_loss = min(val_loss)
+        min_val_loss_epoch = val_loss.index(min_val_loss)  # Epoch numbers are 1-indexed
+
         # Select the appropriate subplot for the loss plot
         ax_loss = axes[2 * fold]
         ax_loss.plot(history.history['loss'], label='Train Loss')
@@ -279,16 +331,25 @@ def log_results(cv_results, config=None, start=datetime.now(), note=""):
         ax_loss.legend()
         ax_loss.grid(True)
 
+        # Plot the point for the minimum validation loss (black point)
+        ax_loss.scatter(min_val_loss_epoch, min_val_loss, color='black', s=100, zorder=5, label='Min Val Loss')
+
+        # Annotate the point with the value of the minimum validation loss
+        ax_loss.text(min_val_loss_epoch, min_val_loss, f'{min_val_loss:.4f}', color='black',
+                     ha='center', va='bottom', fontsize=10)
+
         # Select the appropriate subplot for the scatter plot
         ax_scatter = axes[2 * fold + 1]
         y_test = result['y_test']
         y_pred = result['y_pred']
-        ax_scatter.scatter(y_test, y_pred, alpha=0.5, s=10)
+        ax_scatter.scatter(y_test, y_pred, alpha=0.5, s=0.5)
         ax_scatter.plot([min(y_test), max(y_test)], [min(y_test), max(y_test)], color='red')  # Add red line y=x
         ax_scatter.set_xlabel('Actual Values')
         ax_scatter.set_ylabel('Predicted Values')
         ax_scatter.set_title(f'Predicted vs. Actual Values - Fold {fold + 1}')
         ax_scatter.grid(True)
+
+
 
     # Remove any empty subplots if the number of folds is odd
     if num_folds % 2 != 0:
@@ -482,13 +543,22 @@ def main():
                 'n_samples': len(y_test_range)
             }
 
+        # Get validation loss history
+        val_loss = history.history['val_loss']
+
+        # Find the epoch with the minimum validation loss
+        min_val_loss = min(val_loss)
+        min_val_loss_epoch = val_loss.index(min_val_loss) + 1  # Epoch numbers are 1-indexed
+
         cv_results.append({
             'model': model,
             'history': history,
             'mae': mae,
             'y_test': y_test,
             'y_pred': y_pred,
-            'layered_metrics': layered_metrics
+            'min_val_loss': min_val_loss,
+            'layered_metrics': layered_metrics,
+            'n_epochs': len(history.history["val_loss"])
         })
 
     log_results(cv_results, config, start)
