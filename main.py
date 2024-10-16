@@ -116,7 +116,7 @@ def apply_scaling(X: pd.DataFrame, sconf: dict) -> (pd.DataFrame, dict):
         standard_cols = sconf["standard"]
         if "predictions" in standard_cols:
             standard_cols.remove("predictions")
-            standard_cols += ["f15", "p15", "t15", "theta15"]
+            standard_cols += ["f15", "p15", "t15", "theta15", "N2"]
 
         for col in standard_cols:
             if col in X.columns:
@@ -204,20 +204,45 @@ def compile_and_train(X_train, y_train, model, tconf):
 
     if tconf["loss"] == "mse":
         loss = MeanSquaredError()
-    elif tconf["loss"] == "mae":
+    elif tconf["loss"] == "mae" or tconf["loss"] == "weighted":
         loss = MeanAbsoluteError()
     else:
         raise ValueError(f"Unsupported loss function: {tconf['loss']}")
 
     model.compile(
-        optimizer=optimizer, loss=loss, metrics=['mae']
+        optimizer=optimizer, loss=loss, metrics=['mae'], weighted_metrics=[]
     )
+    if tconf["loss"] == "weighted":
+        sample_weights = resolve_sample_weights(y_train)
+        history = model.fit(
+            X_train, y_train, epochs=tconf['epochs'], validation_split=tconf['validation_split'],
+            batch_size=tconf['batch_size'], sample_weight=sample_weights
+        )
 
-    history = model.fit(
-        X_train, y_train, epochs=tconf['epochs'], validation_split=tconf['validation_split'],
-        batch_size=tconf['batch_size'], callbacks=[early_stopping]
-    )
+    else:
+        history = model.fit(
+            X_train, y_train, epochs=tconf['epochs'], validation_split=tconf['validation_split'],
+            batch_size=tconf['batch_size']
+        )
+
     return model, history
+
+
+def resolve_sample_weights(y):
+    sample_weights = y.apply(lambda x: return_weight(x))
+    return sample_weights.to_numpy()
+
+
+def return_weight(sample):
+    # Returns flat np.array with weights for X
+
+    if 0.0 <= sample < 10.0:
+        return 1
+
+    if 10.0 <= sample < 20.0:
+        return 2
+
+    return 10
 
 
 def prepare_features(features):
@@ -255,8 +280,8 @@ def log_results(cv_results, config=None, start=datetime.now(), note=""):
 
     # Calculate mean and std of absolute error
     mean_absolute_errors = [result['mae'] for result in cv_results]
-    min_val_losses = [result['mae'] for result in cv_results]
-    epochs = [result['n_epochs'] for result in cv_results]
+    min_val_losses = [result['min_val_loss'] for result in cv_results]
+    epochs = [result['min_val_loss_epoch'] for result in cv_results]
     mean_mae = np.mean(mean_absolute_errors)
     std_mae = np.std(mean_absolute_errors)
     min_epoch = min(epochs)
@@ -499,14 +524,13 @@ def prepare_report(cv_results, report_filename='report.pdf', config=None, start=
     print(f"Report saved as {report_filename}")
 
 
-def main():
+def main(config=None):
     start = datetime.now()
 
     pd.set_option('display.max_columns', None)
     pd.set_option('display.width', None)
     pd.set_option('display.float_format', '{:.2f}'.format)
 
-    config = json_to_dict()
     X, y = read_data(config["data"])
     X, scalers = apply_scaling(X, config["scaling"])
 
@@ -558,14 +582,115 @@ def main():
             'y_pred': y_pred,
             'min_val_loss': min_val_loss,
             'layered_metrics': layered_metrics,
-            'n_epochs': len(history.history["val_loss"])
+            'n_epochs': len(history.history["val_loss"]),
+            'min_val_loss_epoch': min_val_loss_epoch
         })
 
     log_results(cv_results, config, start)
 
 
 if __name__ == '__main__':
-    main()
+    # f15 + TRI
+    config = json_to_dict()
+
+    """# Baseline
+    main(config)
+
+    # f15 + pred
+    config["data"]["features"] = {
+        "location": False,
+        "predictions": ["f15", "p15", "t15", "N2"],
+        "elevation": 0,
+        "stations": False,
+    }
+    config["note"] = "2 baseline + pred"
+
+    main(config)
+
+    # f15 + location
+    config["data"]["features"] = {
+        "location": True,
+        "predictions": ["f15"],
+        "elevation": 0,
+        "stations": False,
+    }
+    config["note"] = "3 baseline + location"
+
+    main(config)
+
+    # f15 + elevation
+    config["data"]["features"] = {
+        "location": False,
+        "predictions": ["f15"],
+        "elevation": 20000,
+        "stations": False,
+    }
+    config["note"] = "4 baseline + elevation"
+
+    main(config)
+
+    # f15 + elevation + location
+    config["data"]["features"] = {
+        "location": True,
+        "predictions": ["f15"],
+        "elevation": 20000,
+        "stations": False,
+    }
+    config["note"] = "5 baseline + elevation + location"
+
+    main(config)
+
+    # f15 + prediction + elevation
+    config["data"]["features"] = {
+        "location": False,
+        "predictions": ["f15", "p15", "t15", "N2"],
+        "elevation": 20000,
+        "stations": False,
+    }
+    config["note"] = "6 prediction + elevation"
+
+    # f15 + prediction + location + one-hot-enoding
+    config["data"]["features"] = {
+        "location": False,
+        "predictions": ["f15", "p15", "t15", "N2"],
+        "elevation": 20000,
+        "stations": False,
+    }
+    config["note"] = "7 baseline + one-hot-encoding + location"
 
 
-    # prepare_report(cv_results, f'{formatted_time}_report.pdf', config, start)
+    main(config)
+
+    config["data"]["features"] = {
+        "location": False,
+        "predictions": ["f15"],
+        "elevation": 0,
+        "stations": False,
+        "various": ["TRI"]
+    }
+    config["note"] = "8 baseline + TRI"
+    main(config)
+
+    # f15 + min_dist_to_ocean + ocean_wind_indicator
+
+    config["data"]["features"] = {
+        "location": False,
+        "predictions": ["f15"],
+        "elevation": 0,
+        "stations": False,
+        "various": ["min_dist_to_ocean", "ocean_wind_indicator"]
+    }
+    config["note"] = "9 baseline + min_dist + ocean_wind"
+    main(config)"""
+
+    # All - OHE stations
+
+    config["data"]["features"] = {
+        "location": True,
+        "predictions": ["f15", "p15", "t15", "N2"],
+        "elevation": 20000,
+        "stations": False,
+        "various": ["min_dist_to_ocean", "ocean_wind_indicator", "TRI"]
+    }
+    config["note"] = "13 Weights {1, 2, 10}"
+    main(config)

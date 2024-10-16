@@ -6,15 +6,15 @@
         "target": "f",
         "features":
         {
-            "location": true,
-            "predictions": ["f15", "p15", "t15"],
+            "location": false,
+            "predictions": ["f15"],
             "elevation": 0,
             "stations": false,
             "various": []
         }
     },
     "scaling": {
-        "standard": ["predictions", "N2"],
+        "standard": ["predictions"],
         "minmax": ["location", "elevation", "TRI", "min_dist_to_ocean"]
     },
     "architecture": {
@@ -57,18 +57,18 @@
     "training": {
         "optimizer": "adam",
         "learning_rate": 0.0005,
-        "loss": "mae",
-        "epochs": 100,
+        "loss": "weighted",
+        "epochs": 150,
         "validation_split": 0.15,
         "test_split": 0.15,
-        "batch_size": 128,
+        "batch_size": 256,
         "early_stopping": {
-            "use": true,
+            "use": false,
             "patience": 10,
             "verbose": 1,
             "restore": true
         }
     },
-    "note": "baseline+pred+location",
+    "note": "1 baseline",
     "png_name": true
 }

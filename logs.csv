@@ -1,3 +1,15 @@
 timestamp,min_n_epoch,min_val_loss_avg,min_val_loss_std,test_mae_avg,test_mae_std,mae_0-10,mae_10-20,mae_20-30,mae_30-inf,n_splits,epochs,training_time,loss,batch_size,learning_rate,n_features,features,dataset,note
-06-10-2024T23:29:21,11,2.133,0.004,2.133,0.004,1.854,3.162,7.782,16.209,3,100,0 days 00:09:45.669847,mae,128,0.0005,5,f15,5oct,baseline
-07-10-2024T10:11:11,19,2.088,0.004,2.088,0.004,1.824,3.087,7.061,14.964,3,100,0 days 00:15:02.894905,mae,128,0.0005,5,"f15, p15, t15",5oct,baseline+pred
+13-10-2024T16:37:48,1,2.073,0.004,2.135,0.005,1.84,3.213,8.275,16.945,3,150,0 days 01:15:40.352071,mae,256,0.0005,5,f15,5oct,1 baseline
+13-10-2024T17:53:30,32,2.022,0.003,2.078,0.005,1.815,3.047,7.345,15.487,3,150,0 days 01:14:11.368850,mae,256,0.0005,4,"f15, p15, t15, N2",5oct,2 baseline + pred
+13-10-2024T19:07:42,136,1.82,0.005,1.878,0.016,1.657,2.74,5.545,11.255,3,150,0 days 01:17:08.274922,mae,256,0.0005,4,"lat, lon, height_ASL, f15",5oct,3 baseline + location
+13-10-2024T20:24:51,76,1.756,0.003,1.845,0.03,1.55,3.016,6.492,11.738,3,150,0 days 02:47:02.147358,mae,256,0.0005,4,"f15, elevation",5oct,4 baseline + elevation
+13-10-2024T23:11:54,88,1.74,0.005,1.827,0.033,1.536,2.989,6.321,11.975,3,150,0 days 06:45:53.588243,mae,256,0.0005,4,"lat, lon, height_ASL, f15, elevation",5oct,5 baseline + elevation + location
+14-10-2024T05:57:48,130,1.738,0.009,1.814,0.01,1.545,2.88,6.134,11.321,3,150,0 days 02:43:50.948315,mae,256,0.0005,4,"f15, p15, t15, N2, elevation",5oct,7 baseline + one-hot-encoding + location
+14-10-2024T09:07:18,69,2.006,0.004,2.067,0.005,1.759,3.212,8.066,17.74,3,150,0 days 01:18:45.396615,mae,256,0.0005,5,"f15, TRI",5oct,8 baseline + TRI
+14-10-2024T10:26:04,124,1.973,0.005,2.02,0.002,1.766,2.975,6.797,14.446,3,150,0 days 01:13:14.708969,mae,256,0.0005,5,"f15, min_dist_to_ocean, ocean_wind_indicator",5oct,9 baseline + min_dist + ocean_wind
+14-10-2024T11:39:20,87,1.72,0.004,1.818,0.024,1.511,3.057,6.309,11.548,3,150,0 days 01:13:03.624682,mae,256,0.0005,5,"lat, lon, height_ASL, f15, p15, t15, N2, elevation, min_dist_to_ocean, ocean_wind_indicator, TRI",5oct,10 ALL - OHE stations
+14-10-2024T12:52:24,130,1.701,0.008,1.792,0.013,1.494,2.988,6.278,11.818,3,150,0 days 01:25:18.355037,mae,256,0.0005,5,"lat, lon, height_ASL, f15, p15, t15, N2, elevation, min_dist_to_ocean, ocean_wind_indicator, TRI",5oct,8 ALL + OHE STATIONS
+14-10-2024T14:17:44,81,1.702,0.002,1.794,0.037,1.495,2.998,6.279,11.697,3,150,0 days 01:29:39.883820,mae,256,0.0005,5,"lat, lon, height_ASL, f15, p15, t15, N2, elevation, min_dist_to_ocean, ocean_wind_indicator, TRI",5oct,8 ALL + OHE STATIONS
+16-10-2024T09:35:01,124,2.08,0.002,1.725,0.004,1.631,2.05,3.974,7.374,3,150,0 days 01:16:59.105672,weighted,256,0.0005,5,"lat, lon, height_ASL, f15, p15, t15, N2, elevation, min_dist_to_ocean, ocean_wind_indicator, TRI",5oct,11 Weights
+16-10-2024T10:56:01,112,2.509,0.008,1.764,0.018,1.699,1.967,3.571,7.096,3,150,0 days 01:56:46.178393,weighted,256,0.0005,5,"lat, lon, height_ASL, f15, p15, t15, N2, elevation, min_dist_to_ocean, ocean_wind_indicator, TRI",5oct,"12 Weights {1, 3, 6}"
+16-10-2024T13:11:48,109,2.321,0.009,1.756,0.028,1.66,2.149,3.059,6.762,3,150,0 days 01:17:52.301828,weighted,256,0.0005,5,"lat, lon, height_ASL, f15, p15, t15, N2, elevation, min_dist_to_ocean, ocean_wind_indicator, TRI",5oct,"13 Weights {1, 2, 10}"
