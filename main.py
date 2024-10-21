@@ -213,7 +213,7 @@ def compile_and_train(X_train, y_train, model, tconf):
         optimizer=optimizer, loss=loss, metrics=['mae'], weighted_metrics=[]
     )
     if tconf["loss"] == "weighted":
-        sample_weights = resolve_sample_weights(y_train)
+        sample_weights = resolve_sample_weights(y_train, tconf["parameters"])
         history = model.fit(
             X_train, y_train, epochs=tconf['epochs'], validation_split=tconf['validation_split'],
             batch_size=tconf['batch_size'], sample_weight=sample_weights
@@ -228,21 +228,16 @@ def compile_and_train(X_train, y_train, model, tconf):
     return model, history
 
 
-def resolve_sample_weights(y):
-    sample_weights = y.apply(lambda x: return_weight(x))
+def resolve_sample_weights(y, param):
+    sample_weights = y.apply(lambda x: return_weight(x, param))
     return sample_weights.to_numpy()
 
 
-def return_weight(sample):
+def return_weight(sample, param):
     # Returns flat np.array with weights for X
+    a = float(param["a"]) if "a" in param.keys() else 0
 
-    if 0.0 <= sample < 10.0:
-        return 1
-
-    if 10.0 <= sample < 20.0:
-        return 2
-
-    return 10
+    return max((sample/5.0)**a, (30.0/5.0)**a)
 
 
 def prepare_features(features):
@@ -255,7 +250,7 @@ def prepare_features(features):
         s += ', '.join(features["predictions"])
 
     if features.get("elevation"):
-        s += ", elevation"
+        s += ", elevation data"
 
     if features.get("various"):
         s += ", " if len(s) > 0 else ""
@@ -280,19 +275,23 @@ def log_results(cv_results, config=None, start=datetime.now(), note=""):
 
     # Calculate mean and std of absolute error
     mean_absolute_errors = [result['mae'] for result in cv_results]
-    min_val_losses = [result['min_val_loss'] for result in cv_results]
-    epochs = [result['min_val_loss_epoch'] for result in cv_results]
+    min_val_maes = [result['min_val_mae'] for result in cv_results]
+    epochs = [result['min_val_mae_epoch'] for result in cv_results]
     mean_mae = np.mean(mean_absolute_errors)
     std_mae = np.std(mean_absolute_errors)
-    min_epoch = min(epochs)
+    min_epoch = np.mean(epochs)
+
+    if loss == "weighted":
+        a = config.get("training", {}).get("parameters", {}).get("a")
+        loss = f"a={a} - weighted (f/5)^a"
 
     dictionary = {
         "timestamp": timestamp,
-        "min_n_epoch": min_epoch,
-        "min_val_loss_avg": np.round(np.mean(min_val_losses), 3),
-        "min_val_loss_std": np.round(np.std(min_val_losses), 3),
-        "test_mae_avg": np.round(mean_mae, 3),
-        "test_mae_std": np.round(std_mae, 3),
+        "avg-min-epoch": min_epoch,
+        "mae-all": np.round(np.mean(min_val_maes), 3),
+        "mae-std": np.round(np.std(min_val_maes), 3),
+        "test-mae-all": np.round(mean_mae, 3),
+        "test-std-all": np.round(std_mae, 3),
     }
 
     ranges = [(0, 10), (10, 20), (20, 30), (30, float('inf'))]
@@ -300,7 +299,7 @@ def log_results(cv_results, config=None, start=datetime.now(), note=""):
     combined_layered_metrics = [split["layered_metrics"] for split in cv_results]
 
     dictionary.update({
-        f"mae_{key}": np.round(
+        f"mae-{key}": np.round(
             np.mean([clm[key]['mae'] for clm in combined_layered_metrics]), 3
         ) for key in keys
     })
@@ -308,9 +307,9 @@ def log_results(cv_results, config=None, start=datetime.now(), note=""):
     feature_string = prepare_features(features)
 
     dictionary.update({
-        'n_splits': n_splits, 'epochs': n_epochs, 'training_time': training_time, 'loss': loss,
-        'batch_size': batch_size, 'learning_rate': learning_rate, 'n_features': len(features),
-        'features': feature_string, 'dataset': dataset, 'note': note
+        'n-splits': n_splits, 'epochs': n_epochs, 'training-time': training_time, 'loss': loss,
+        'batch-size': batch_size, 'init-lr': learning_rate, 'features': feature_string,
+        'dataset': dataset, 'note': note
     })
 
     try:
@@ -343,8 +342,8 @@ def log_results(cv_results, config=None, start=datetime.now(), note=""):
         val_loss = history.history['val_loss']
 
         # Find the epoch with the minimum validation loss
-        min_val_loss = min(val_loss)
-        min_val_loss_epoch = val_loss.index(min_val_loss)  # Epoch numbers are 1-indexed
+        min_val_mae = min(val_loss)
+        min_val_mae_epoch = val_loss.index(min_val_mae)  # Epoch numbers are 1-indexed
 
         # Select the appropriate subplot for the loss plot
         ax_loss = axes[2 * fold]
@@ -357,10 +356,10 @@ def log_results(cv_results, config=None, start=datetime.now(), note=""):
         ax_loss.grid(True)
 
         # Plot the point for the minimum validation loss (black point)
-        ax_loss.scatter(min_val_loss_epoch, min_val_loss, color='black', s=100, zorder=5, label='Min Val Loss')
+        ax_loss.scatter(min_val_mae_epoch, min_val_mae, color='black', s=100, zorder=5, label='Min Val Loss')
 
         # Annotate the point with the value of the minimum validation loss
-        ax_loss.text(min_val_loss_epoch, min_val_loss, f'{min_val_loss:.4f}', color='black',
+        ax_loss.text(min_val_mae_epoch, min_val_mae, f'{min_val_mae:.4f}', color='black',
                      ha='center', va='bottom', fontsize=10)
 
         # Select the appropriate subplot for the scatter plot
@@ -373,8 +372,6 @@ def log_results(cv_results, config=None, start=datetime.now(), note=""):
         ax_scatter.set_ylabel('Predicted Values')
         ax_scatter.set_title(f'Predicted vs. Actual Values - Fold {fold + 1}')
         ax_scatter.grid(True)
-
-
 
     # Remove any empty subplots if the number of folds is odd
     if num_folds % 2 != 0:
@@ -390,138 +387,6 @@ def log_results(cv_results, config=None, start=datetime.now(), note=""):
 
     plt.savefig(combined_plot_filename, format='png')
     plt.close()
-
-
-def prepare_report(cv_results, report_filename='report.pdf', config=None, start=datetime.now()):
-    training_time = datetime.now() - start
-
-    if config:
-        # Get the number of splits and features from the config
-        n_splits = config.get("cross_validation", {}).get("n_splits", "N/A")
-        features = config.get("data", {}).get("features", "N/A")
-        loss = config.get("training", {}).get("loss", "N/A")
-        batch_size = config.get("training", {}).get("batch_size", "N/A")
-        learning_rate = config.get("training", {}).get("learning_rate", "N/A")
-
-    # Calculate mean and std of absolute error
-    mean_absolute_errors = [result['mae'] for result in cv_results]
-    mean_mae = np.mean(mean_absolute_errors)
-    std_mae = np.std(mean_absolute_errors)
-
-    # Create the PDF
-    pdf = FPDF()
-    pdf.add_page()
-    pdf.set_font("Arial", size=16)
-    pdf.cell(200, 10, txt="Cross-Validation Report", ln=True, align='C')
-    pdf.ln(10)
-    pdf.set_font("Arial", size=12)
-
-    # Add number of splits and features used to the document
-    if config:
-        pdf.cell(200, 10, txt=f"Number of Cross-Validation Splits: {n_splits}", ln=True, align='L')
-        pdf.ln(5)
-        pdf.cell(200, 10, txt=f"Features Used: {', '.join(features)}", ln=True, align='L')
-        pdf.ln(5)
-        pdf.cell(200, 10, txt=f"Loss function: {loss}", ln=True, align='L')
-        pdf.ln(5)
-        pdf.cell(200, 10, txt=f"Batch size: {batch_size}", ln=True, align='L')
-        pdf.ln(5)
-        pdf.cell(200, 10, txt=f"Training time: {training_time}", ln=True, align='L')
-        pdf.ln(5)
-        pdf.cell(200, 10, txt=f"Learning rate: {learning_rate}", ln=True, align='L')
-        pdf.ln(10)
-
-    pdf.cell(200, 10, txt=f"Mean Absolute Error: {mean_mae:.2f} ± {std_mae:.2f}", ln=True, align='L')
-    pdf.ln(10)
-    pdf.ln(10)
-
-    # Add layered metrics for each fold
-    for fold, result in enumerate(cv_results):
-        layered_metrics = result['layered_metrics']
-
-        pdf.add_page()
-        pdf.set_font("Arial", size=14)
-        pdf.cell(200, 10, txt=f"Layered Metrics - Fold {fold + 1}", ln=True, align='L')
-        pdf.ln(10)
-        pdf.set_font("Arial", size=12)
-
-        # Table header
-        pdf.cell(50, 10, txt="Range", border=1)
-        pdf.cell(40, 10, txt="MAE", border=1)
-        pdf.cell(40, 10, txt="MSE", border=1)
-        pdf.cell(40, 10, txt="Samples", border=1)
-        pdf.ln(10)
-
-        # Table content
-        for range_key, metrics in layered_metrics.items():
-            pdf.cell(50, 10, txt=range_key, border=1)
-            pdf.cell(40, 10, txt=f"{metrics['mae']:.2f}" if metrics['mae'] is not None else "N/A", border=1)
-            pdf.cell(40, 10, txt=f"{metrics['mse']:.2f}" if metrics['mse'] is not None else "N/A", border=1)
-            pdf.cell(40, 10, txt=str(metrics['n_samples']), border=1)
-            pdf.ln(10)
-
-    for fold, result in enumerate(cv_results):
-        history = result['history']
-
-        # Create the loss plot
-        plt.figure(figsize=(5, 4))
-        plt.plot(history.history['loss'], label='Train Loss')
-        plt.plot(history.history['val_loss'], label='Validation Loss')
-        plt.xlabel('Epochs')
-        plt.ylabel('Loss')
-        plt.title(f'Training and Validation Loss History - Fold {fold + 1}')
-        plt.legend()
-        plt.grid(True)
-
-        # Save the plot to a BytesIO object
-        loss_plot_buffer = BytesIO()
-        plt.savefig(loss_plot_buffer, format='png')
-        plt.close()
-        loss_plot_buffer.seek(0)
-
-        # Create the scatter plot
-        y_test = result['y_test']
-        y_pred = result['y_pred']
-
-        plt.figure(figsize=(5, 4))
-        plt.scatter(y_test, y_pred, alpha=0.5, s=10)  # Smaller dots with s=10
-        plt.plot([min(y_test), max(y_test)], [min(y_test), max(y_test)], color='red')  # Add red line y=x
-        plt.xlabel('Actual Values')
-        plt.ylabel('Predicted Values')
-        plt.title(f'Predicted vs. Actual Values - Fold {fold + 1}')
-        plt.grid(True)
-
-        # Save the plot to a BytesIO object
-        scatter_plot_buffer = BytesIO()
-        plt.savefig(scatter_plot_buffer, format='png')
-        plt.close()
-        scatter_plot_buffer.seek(0)
-
-        # Use PIL to open the image and save it in a compatible format for fpdf
-        loss_image = Image.open(loss_plot_buffer)
-        scatter_image = Image.open(scatter_plot_buffer)
-
-        loss_plot_filename = f'loss_history_fold_{fold + 1}.png'
-        scatter_plot_filename = f'pred_vs_actual_fold_{fold + 1}.png'
-
-        loss_image.save(loss_plot_filename)
-        scatter_image.save(scatter_plot_filename)
-
-        # Add the plots to the PDF side by side
-        pdf.add_page()
-        pdf.set_font("Arial", size=12)
-        pdf.cell(200, 10, txt=f"Loss and Predicted vs. Actual Values - Fold {fold + 1}:", ln=True, align='L')
-        pdf.image(loss_plot_filename, x=10, y=30, w=90)
-        pdf.image(scatter_plot_filename, x=110, y=30, w=90)
-        pdf.ln(5)  # Adjust this value based on the image size
-
-        # Remove the temporary plot files
-        os.remove(loss_plot_filename)
-        os.remove(scatter_plot_filename)
-
-    # Save the PDF
-    pdf.output(report_filename)
-    print(f"Report saved as {report_filename}")
 
 
 def main(config=None):
@@ -568,11 +433,11 @@ def main(config=None):
             }
 
         # Get validation loss history
-        val_loss = history.history['val_loss']
+        val_mae = history.history['val_mae']
 
         # Find the epoch with the minimum validation loss
-        min_val_loss = min(val_loss)
-        min_val_loss_epoch = val_loss.index(min_val_loss) + 1  # Epoch numbers are 1-indexed
+        min_val_mae = min(val_mae)
+        min_val_mae_epoch = val_mae.index(min_val_mae) + 1  # Epoch numbers are 1-indexed
 
         cv_results.append({
             'model': model,
@@ -580,10 +445,10 @@ def main(config=None):
             'mae': mae,
             'y_test': y_test,
             'y_pred': y_pred,
-            'min_val_loss': min_val_loss,
+            'min_val_mae': min_val_mae,
             'layered_metrics': layered_metrics,
             'n_epochs': len(history.history["val_loss"]),
-            'min_val_loss_epoch': min_val_loss_epoch
+            'min_val_mae_epoch': min_val_mae_epoch
         })
 
     log_results(cv_results, config, start)
@@ -593,104 +458,54 @@ if __name__ == '__main__':
     # f15 + TRI
     config = json_to_dict()
 
-    """# Baseline
-    main(config)
-
-    # f15 + pred
-    config["data"]["features"] = {
+    feat_conf_1 = {
         "location": False,
-        "predictions": ["f15", "p15", "t15", "N2"],
+        "predictions": ["f15"],
         "elevation": 0,
         "stations": False,
+        "various": [],
+        "note": "1 BL wted"
     }
-    config["note"] = "2 baseline + pred"
 
-    main(config)
-
-    # f15 + location
-    config["data"]["features"] = {
+    feat_conf_2 = {
         "location": True,
         "predictions": ["f15"],
         "elevation": 0,
         "stations": False,
+        "various": [],
+        "note": "2 BL + loc wted"
     }
-    config["note"] = "3 baseline + location"
 
-    main(config)
-
-    # f15 + elevation
-    config["data"]["features"] = {
+    feat_conf_3 = {
         "location": False,
         "predictions": ["f15"],
         "elevation": 20000,
         "stations": False,
+        "various": [],
+        "note": "3 BL + elev wted"
     }
-    config["note"] = "4 baseline + elevation"
 
-    main(config)
-
-    # f15 + elevation + location
-    config["data"]["features"] = {
+    feat_conf_4 = {
         "location": True,
         "predictions": ["f15"],
         "elevation": 20000,
         "stations": False,
+        "various": [],
+        "note": "4 BL + elev + loc wted"
     }
-    config["note"] = "5 baseline + elevation + location"
 
-    main(config)
-
-    # f15 + prediction + elevation
-    config["data"]["features"] = {
-        "location": False,
-        "predictions": ["f15", "p15", "t15", "N2"],
-        "elevation": 20000,
-        "stations": False,
-    }
-    config["note"] = "6 prediction + elevation"
-
-    # f15 + prediction + location + one-hot-enoding
-    config["data"]["features"] = {
-        "location": False,
-        "predictions": ["f15", "p15", "t15", "N2"],
-        "elevation": 20000,
-        "stations": False,
-    }
-    config["note"] = "7 baseline + one-hot-encoding + location"
-
-
-    main(config)
-
-    config["data"]["features"] = {
-        "location": False,
-        "predictions": ["f15"],
-        "elevation": 0,
-        "stations": False,
-        "various": ["TRI"]
-    }
-    config["note"] = "8 baseline + TRI"
-    main(config)
-
-    # f15 + min_dist_to_ocean + ocean_wind_indicator
-
-    config["data"]["features"] = {
-        "location": False,
-        "predictions": ["f15"],
-        "elevation": 0,
-        "stations": False,
-        "various": ["min_dist_to_ocean", "ocean_wind_indicator"]
-    }
-    config["note"] = "9 baseline + min_dist + ocean_wind"
-    main(config)"""
-
-    # All - OHE stations
-
-    config["data"]["features"] = {
+    feat_conf_5 = {
         "location": True,
-        "predictions": ["f15", "p15", "t15", "N2"],
+        "predictions": ["f15", "N2"],
         "elevation": 20000,
         "stations": False,
-        "various": ["min_dist_to_ocean", "ocean_wind_indicator", "TRI"]
+        "various": ["min_dist_to_ocean", "ocean_wind_indicator", "TRI"],
+        "note": "5 All wted"
     }
-    config["note"] = "13 Weights {1, 2, 10}"
-    main(config)
+
+    for a in [0, 1, 2]:
+        for feat_conf in [feat_conf_1, feat_conf_2, feat_conf_3, feat_conf_4, feat_conf_5]:
+            config["training"]["parameters"]["a"] = a
+            config["data"]["features"] = feat_conf
+            config["note"] = feat_conf["note"]
+            main(config)
