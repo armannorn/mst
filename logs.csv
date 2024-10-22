@@ -6,3 +6,11 @@ timestamp,avg-min-epoch,mae-all,mae-std,test-mae-all,test-std-all,mae-0-10,mae-1
 21-10-2024T01:33:30,124.33333333333331,1.718,0.009,1.804,0.009,1.531,2.89,6.046,11.484,3,150,0 days 06:26:04.002433,a=0 - weighted (f/5)^a,256,0.0005,"lat, lon, height_ASL, f15, N2, elevation data, min_dist_to_ocean, ocean_wind_indicator, TRI",5oct,5 All wted
 21-10-2024T07:59:35,4.0,2.072,0.005,2.134,0.003,1.849,3.173,8.086,16.755,3,150,0 days 02:01:41.971200,a=1 - weighted (f/5)^a,256,0.0005,f15,5oct,1 BL wted
 21-10-2024T10:01:18,142.33333333333334,1.823,0.005,1.875,0.005,1.673,2.661,5.356,10.729,3,150,0 days 01:14:29.362958,a=1 - weighted (f/5)^a,256,0.0005,"lat, lon, height_ASL, f15",5oct,2 BL + loc wted
+21-10-2024T11:15:48,124.0,1.745,0.007,1.85,0.016,1.534,3.116,6.767,12.402,3,150,0 days 01:17:41.584376,a=1 - weighted (f/5)^a,256,0.0005,"f15, elevation data",5oct,3 BL + elev wted
+21-10-2024T12:33:30,92.66666666666669,1.741,0.007,1.84,0.016,1.531,3.086,6.459,11.588,3,150,0 days 02:09:23.203687,a=1 - weighted (f/5)^a,256,0.0005,"lat, lon, height_ASL, f15, elevation data",5oct,4 BL + elev + loc wted
+21-10-2024T14:42:54,124.33333333333331,1.727,0.006,1.811,0.009,1.519,2.981,6.283,11.691,3,150,0 days 01:57:45.393450,a=1 - weighted (f/5)^a,256,0.0005,"lat, lon, height_ASL, f15, N2, elevation data, min_dist_to_ocean, ocean_wind_indicator, TRI",5oct,5 All wted
+21-10-2024T16:40:40,17.0,2.072,0.005,2.134,0.006,1.858,3.147,7.842,16.251,3,150,0 days 01:16:48.141024,a=2 - weighted (f/5)^a,256,0.0005,f15,5oct,1 BL wted
+21-10-2024T17:57:29,125.66666666666669,1.821,0.003,1.881,0.008,1.671,2.687,5.672,11.037,3,150,0 days 01:57:52.114343,a=2 - weighted (f/5)^a,256,0.0005,"lat, lon, height_ASL, f15",5oct,2 BL + loc wted
+21-10-2024T19:55:22,118.0,1.751,0.004,1.856,0.023,1.533,3.156,6.748,11.72,3,150,0 days 01:15:11.886036,a=2 - weighted (f/5)^a,256,0.0005,"f15, elevation data",5oct,3 BL + elev wted
+21-10-2024T21:10:35,99.66666666666669,1.741,0.008,1.817,0.011,1.536,2.945,6.203,11.162,3,150,0 days 01:13:49.932351,a=2 - weighted (f/5)^a,256,0.0005,"lat, lon, height_ASL, f15, elevation data",5oct,4 BL + elev + loc wted
+21-10-2024T22:24:25,127.0,1.724,0.002,1.798,0.016,1.522,2.911,5.931,10.411,3,150,0 days 05:12:21.772567,a=2 - weighted (f/5)^a,256,0.0005,"lat, lon, height_ASL, f15, N2, elevation data, min_dist_to_ocean, ocean_wind_indicator, TRI",5oct,5 All wted
