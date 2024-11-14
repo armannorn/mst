@@ -15,7 +15,7 @@ from keras.optimizers import Adam
 from keras.losses import MeanSquaredError
 from keras.losses import MeanAbsoluteError
 from keras.layers import Dense, Dropout, Conv2D, Flatten
-
+from keras.callbacks import Callback
 from keras.callbacks import EarlyStopping
 
 import json
@@ -184,18 +184,7 @@ def build_model(aconf, input_shape):
     return model
 
 
-def compile_and_train(X_train, y_train, model, tconf):
-    # Define early stopping
-    if tconf["early_stopping"]["use"]:
-        esconf = tconf["early_stopping"]
-        early_stopping = EarlyStopping(
-            monitor='val_loss',  # Metric to monitor (e.g., validation loss)
-            patience=esconf["patience"],  # Number of epochs to wait after last improvement
-            verbose=esconf["verbose"],  # Verbose output when stopping
-            restore_best_weights=esconf["restore"]  # Restore model weights from the epoch with the best validation loss
-        )
-    else:
-        early_stopping = None
+def compile_and_train(X_train, y_train, X_val, y_val, model, tconf):
 
     if tconf["optimizer"] == "adam":
         optimizer = Adam(learning_rate=tconf["learning_rate"])
@@ -213,23 +202,26 @@ def compile_and_train(X_train, y_train, model, tconf):
         optimizer=optimizer, loss=loss, metrics=['mae'], weighted_metrics=[]
     )
     if tconf["loss"] == "weighted":
-        sample_weights = resolve_sample_weights(y_train, tconf["parameters"])
+        sample_weights = resolve_sample_weights(X_train, tconf["parameters"])
+        # Assuming you've defined `X_val`, `y_val`, and `val_sample_weights` already
+        val_sample_weights = resolve_sample_weights(X_val, tconf["parameters"])
+
         history = model.fit(
-            X_train, y_train, epochs=tconf['epochs'], validation_split=tconf['validation_split'],
+            X_train, y_train, epochs=tconf['epochs'], validation_data=(X_val, y_val),
             batch_size=tconf['batch_size'], sample_weight=sample_weights
         )
 
     else:
         history = model.fit(
-            X_train, y_train, epochs=tconf['epochs'], validation_split=tconf['validation_split'],
+            X_train, y_train, epochs=tconf['epochs'], validation_data=(X_val, y_val),
             batch_size=tconf['batch_size']
         )
 
     return model, history
 
 
-def resolve_sample_weights(y, param):
-    sample_weights = y.apply(lambda x: return_weight(x, param))
+def resolve_sample_weights(X, param):
+    sample_weights = X.f15.apply(lambda x: return_weight(x, param))
     return sample_weights.to_numpy()
 
 
@@ -259,7 +251,7 @@ def prepare_features(features):
     return s
 
 
-def log_results(cv_results, config=None, start=datetime.now(), note=""):
+def log_results(cv_results, config=None, start=datetime.now(), test_mae=0.0, note=""):
     training_time = datetime.now() - start
 
     # Get features from config
@@ -289,12 +281,10 @@ def log_results(cv_results, config=None, start=datetime.now(), note=""):
         "timestamp": timestamp,
         "avg-min-epoch": min_epoch,
         "mae-all": np.round(np.mean(min_val_maes), 3),
-        "mae-std": np.round(np.std(min_val_maes), 3),
-        "test-mae-all": np.round(mean_mae, 3),
-        "test-std-all": np.round(std_mae, 3),
+        "mae-std": np.round(np.std(min_val_maes), 3)
     }
 
-    ranges = [(0, 10), (10, 20), (20, 30), (30, float('inf'))]
+    ranges = [(0, 10), (10, 20), (20, float('inf'))]
     keys = [f'{r[0]}-{r[1]}' for r in ranges]
     combined_layered_metrics = [split["layered_metrics"] for split in cv_results]
 
@@ -309,7 +299,7 @@ def log_results(cv_results, config=None, start=datetime.now(), note=""):
     dictionary.update({
         'n-splits': n_splits, 'epochs': n_epochs, 'training-time': training_time, 'loss': loss,
         'batch-size': batch_size, 'init-lr': learning_rate, 'features': feature_string,
-        'dataset': dataset, 'note': note
+        'dataset': dataset, 'test-mae': test_mae, 'note': note
     })
 
     try:
@@ -364,10 +354,10 @@ def log_results(cv_results, config=None, start=datetime.now(), note=""):
 
         # Select the appropriate subplot for the scatter plot
         ax_scatter = axes[2 * fold + 1]
-        y_test = result['y_test']
+        y_val = result['y_val']
         y_pred = result['y_pred']
-        ax_scatter.scatter(y_test, y_pred, alpha=0.5, s=0.5)
-        ax_scatter.plot([min(y_test), max(y_test)], [min(y_test), max(y_test)], color='red')  # Add red line y=x
+        ax_scatter.scatter(y_val, y_pred, alpha=0.5, s=0.5)
+        ax_scatter.plot([min(y_val), max(y_val)], [min(y_val), max(y_val)], color='red')  # Add red line y=x
         ax_scatter.set_xlabel('Actual Values')
         ax_scatter.set_ylabel('Predicted Values')
         ax_scatter.set_title(f'Predicted vs. Actual Values - Fold {fold + 1}')
@@ -399,37 +389,35 @@ def main(config=None):
     X, y = read_data(config["data"])
     X, scalers = apply_scaling(X, config["scaling"])
 
+    X_train_0, X_test, y_train_0, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
+
     kf = KFold(n_splits=config["cross_validation"]["n_splits"], shuffle=True, random_state=42)
     cv_results = []
 
-    for train_index, test_index in kf.split(X):
-        X_train, X_test = X.iloc[train_index], X.iloc[test_index]
-        y_train, y_test = y.iloc[train_index], y.iloc[test_index]
+    for train_index, val_index in kf.split(X_train_0):
+        X_train, X_val = X_train_0.iloc[train_index], X_train_0.iloc[val_index]
+        y_train, y_val = y_train_0.iloc[train_index], y_train_0.iloc[val_index]
 
         model = build_model(config["architecture"], X_train.shape[1:])
-        model, history = compile_and_train(X_train, y_train, model, config["training"])
+        model, history = compile_and_train(X_train, y_train, X_val, y_val, model, config["training"])
 
-        y_pred = model.predict(X_test)
-        mae = mean_absolute_error(y_test, y_pred)
+        y_pred = model.predict(X_val)
+        mae = mean_absolute_error(y_val, y_pred)
 
         layered_metrics = {}
-        ranges = [(0, 10), (10, 20), (20, 30), (30, float('inf'))]
+        ranges = [(0, 10), (10, 20), (20, float('inf'))]
         for r in ranges:
-            mask = (y_test >= r[0]) & (y_test < r[1])
-            y_test_range = y_test[mask]
+            mask = (y_val >= r[0]) & (y_val < r[1])
+            y_val_range = y_val[mask]
             y_pred_range = y_pred[mask]
 
-            if len(y_test_range) > 0:
-                range_mae = mean_absolute_error(y_test_range, y_pred_range)
-                range_mse = mean_squared_error(y_test_range, y_pred_range)
-            else:
-                range_mae = None
-                range_mse = None
+            range_mae = mean_absolute_error(y_val_range, y_pred_range)
+            range_mse = mean_squared_error(y_val_range, y_pred_range)
 
             layered_metrics[f'{r[0]}-{r[1]}'] = {
                 'mae': range_mae,
                 'mse': range_mse,
-                'n_samples': len(y_test_range)
+                'n_samples': len(y_val_range)
             }
 
         # Get validation loss history
@@ -443,7 +431,7 @@ def main(config=None):
             'model': model,
             'history': history,
             'mae': mae,
-            'y_test': y_test,
+            'y_val': y_val,
             'y_pred': y_pred,
             'min_val_mae': min_val_mae,
             'layered_metrics': layered_metrics,
@@ -451,61 +439,42 @@ def main(config=None):
             'min_val_mae_epoch': min_val_mae_epoch
         })
 
-    log_results(cv_results, config, start)
+    # Select the best-performing model:
+    performances = [d.get("mae") for d in cv_results]
+    best_performance, best_model = min(performances), None
+    for cv in cv_results:
+        if cv.get("mae") == best_performance:
+            best_model = cv.get("model")
+
+    y_pred = best_model.predict(X_test)
+    test_mae = mean_absolute_error(y_test, y_pred)
+
+    log_results(cv_results, config, start, test_mae)
 
 
 if __name__ == '__main__':
     # f15 + TRI
     config = json_to_dict()
 
-    feat_conf_1 = {
-        "location": False,
-        "predictions": ["f15"],
-        "elevation": 0,
-        "stations": False,
-        "various": [],
-        "note": "1 BL wted"
-    }
-
-    feat_conf_2 = {
+    feature_config = {
         "location": True,
         "predictions": ["f15"],
-        "elevation": 0,
-        "stations": False,
-        "various": [],
-        "note": "2 BL + loc wted"
-    }
-
-    feat_conf_3 = {
-        "location": False,
-        "predictions": ["f15"],
-        "elevation": 20000,
-        "stations": False,
-        "various": [],
-        "note": "3 BL + elev wted"
-    }
-
-    feat_conf_4 = {
-        "location": True,
-        "predictions": ["f15"],
-        "elevation": 20000,
-        "stations": False,
-        "various": [],
-        "note": "4 BL + elev + loc wted"
-    }
-
-    feat_conf_5 = {
-        "location": True,
-        "predictions": ["f15", "N2"],
         "elevation": 20000,
         "stations": False,
         "various": ["min_dist_to_ocean", "ocean_wind_indicator", "TRI"],
-        "note": "5 All wted"
+        "note": "5 other"
     }
 
     for a in [0, 1, 2]:
-        for feat_conf in [feat_conf_1, feat_conf_2, feat_conf_3, feat_conf_4, feat_conf_5]:
-            config["training"]["parameters"]["a"] = a
-            config["data"]["features"] = feat_conf
-            config["note"] = feat_conf["note"]
-            main(config)
+        config["training"] = {
+            "optimizer": "adam",
+            "learning_rate": 0.0005,
+            "loss": "weighted",
+            "parameters": {"a": a},
+            "epochs": 150,
+            "test_split": 0.2,
+            "batch_size": 512
+        }
+        config["data"]["features"] = feature_config
+        config["note"] = f"a = {a}"
+        main(config)

@@ -1,5 +1,5 @@
 {
-    "cross_validation": {"n_splits":  3},
+    "cross_validation": {"n_splits":  4},
     "data": {
         "path": "5oct.feather",
         "utility": 1,
@@ -59,16 +59,9 @@
         "learning_rate": 0.0005,
         "loss": "weighted",
         "parameters": {"a": 0},
-        "epochs": 150,
-        "validation_split": 0.15,
-        "test_split": 0.15,
-        "batch_size": 256,
-        "early_stopping": {
-            "use": false,
-            "patience": 10,
-            "verbose": 1,
-            "restore": true
-        }
+        "epochs": 5,
+        "test_split": 0.2,
+        "batch_size": 256
     },
     "note": "1 baseline",
     "png_name": true
