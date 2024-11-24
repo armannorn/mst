@@ -1,111 +1,20 @@
-import colorama.win32
-import colorcet.plotting
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
-from fpdf import FPDF
 from sklearn.model_selection import train_test_split, KFold
 from sklearn.preprocessing import StandardScaler, MinMaxScaler
 from sklearn.metrics import mean_absolute_error, mean_squared_error
 
-from tensorflow import keras
 from keras.models import Sequential
-from keras.layers import Dense
 from keras.optimizers import Adam
-from keras.losses import MeanSquaredError
-from keras.losses import MeanAbsoluteError
+from keras.losses import MeanSquaredError, MeanAbsoluteError
 from keras.layers import Dense, Dropout, Conv2D, Flatten
-from keras.callbacks import Callback
-from keras.callbacks import EarlyStopping
 
-import json
-from io import BytesIO
-from PIL import Image
 import os
-import logging
-import time
 from datetime import datetime
-import sys
 
-
-def json_to_dict(path="config.json"):
-    try:
-        with open(path, 'r') as file:
-            config_dict = json.load(file)
-            return config_dict
-    except FileNotFoundError:
-        print(f"Error: The file at {path} was not found.")
-    except json.JSONDecodeError:
-        print(f"Error: The file at {path} is not a valid JSON file.")
-    except Exception as e:
-        print(f"An unexpected error occurred: {e}")
-
-
-def resolve_columns(df: pd.DataFrame, fconf: dict[str, any]) -> list[str]:
-    r: list[str] = []
-    var_cols = fconf.get("various")
-    pred_cols = fconf.get("predictions")
-    max_e = fconf.get("elevation")
-    stations_in = fconf.get("stations")
-
-    if fconf.get("location"):
-        loc_cols = ["lat", "lon", "h_meas"]
-        r += [col for col in loc_cols if col in df.columns]
-
-    if pred_cols:
-        r += [col for col in pred_cols if col in df.columns]
-
-    if max_e:
-        e_cols = [col for col in df.columns if col.startswith("e") and len(col) >= 2 and col[1].isdigit()]
-        for col in e_cols:
-            if int(col[1:]) < max_e:
-                r += [col]
-
-    if var_cols:
-        r += [col for col in var_cols if col in df.columns]
-
-    if stations_in:
-        r += [col for col in df.columns if col.startswith("station") and col != "station"]
-
-    return r
-
-
-def read_data(dconf: dict[str, any]) -> (pd.DataFrame, pd.Series):
-    data_utility = dconf["utility"]
-    df = pd.read_feather(dconf["path"])
-
-    if data_utility < 1:
-        df = df.sample(frac=data_utility, random_state=42)
-
-    # Fix elevation
-    e_columns = [col for col in df.columns if col.startswith('e') and col[1].isdigit()]
-    overall_min = df[e_columns].min().min()
-    df[e_columns] = df[e_columns].apply(lambda col: col.fillna(overall_min), axis=0)
-
-    if "TRI" in df.columns:
-        df["TRI"] = df["TRI"].fillna(0.0)
-
-    if dconf["features"].get("stations"):
-        df = ohe_stations(df)
-
-    # Which columns are in X
-    cols = resolve_columns(df, dconf["features"])
-
-    if dconf["target"] in df.columns:
-        X = df[cols]
-        y = df[dconf["target"]]
-        return X, y
-    else:
-        return "Error. Target or features not in dataset."
-
-
-def ohe_stations(df):
-    if "station" in df.columns:
-        df["station"] = df["station"].apply(lambda x: str(int(x)))
-        one_hot_df = pd.get_dummies(df['station'], prefix='station').astype(float)
-        df = pd.concat([df, one_hot_df], axis=1)
-
-    return df
+from dataprep import read_data
+from helpers import load_json
 
 
 def apply_scaling(X: pd.DataFrame, sconf: dict) -> (pd.DataFrame, dict):
@@ -454,7 +363,7 @@ def main(config=None):
 
 if __name__ == '__main__':
     # f15 + TRI
-    config = json_to_dict()
+    config = load_json()
 
     feature_config = {
         "location": True,

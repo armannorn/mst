@@ -1,3 +1,4 @@
 /reports/
 /deprec/
 *.feather
+.DS_Store
