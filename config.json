@@ -9,7 +9,6 @@
             "location": false,
             "predictions": ["f15"],
             "elevation": 0,
-            "stations": false,
             "various": []
         }
     },
@@ -55,11 +54,10 @@
         "output_activation": "linear"
     },
     "training": {
-        "optimizer": "adam",
         "learning_rate": 0.0005,
         "loss": "weighted",
         "parameters": {"a": 0},
-        "epochs": 5,
+        "epochs": 10,
         "test_split": 0.2,
         "batch_size": 256
     },

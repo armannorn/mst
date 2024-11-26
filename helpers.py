@@ -1,7 +1,9 @@
 import json
 
 
-def load_json(path="config.json"):
+def load_json(path: str = "config.json"):
+    # Loads a .json file into a dictionary
+
     try:
         with open(path, 'r') as file:
             config_dict = json.load(file)

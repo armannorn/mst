@@ -2,3 +2,72 @@
 /deprec/
 *.feather
 .DS_Store
+
+# Python
+*.pyc
+*.pyo
+*.pyd
+__pycache__/
+*.pdb
+*.log
+*.swp
+*.swo
+*.bak
+*.tmp
+*.idea/  # PyCharm project settings
+.vscode/  # VS Code settings (if using VS Code too)
+
+# Virtual environments
+venv/
+ENV/
+env/
+.venv/
+*.egg-info/
+*.egg
+dist/
+build/
+*.whl
+
+# Jupyter Notebook checkpoints
+.ipynb_checkpoints/
+
+# Data
+/data/
+*.csv
+*.tsv
+*.json
+*.h5
+*.npy
+*.pkl
+*.pkl.gz
+
+# Models
+/models/
+*.h5
+*.pkl
+*.pytorch
+*.pt
+
+# PyCharm specific files
+.idea/
+
+# Test output
+nosetests.xml
+coverage.xml
+*.cover
+*.hypothesis/
+.pytest_cache/
+
+# Logs
+*.log
+
+# Other files
+.DS_Store  # macOS Finder settings
+Thumbs.db  # Windows thumbnail cache
+*.bak  # Backup files
+*.tmp  # Temporary files
+
+# Dependency management
+Pipfile.lock
+poetry.lock
+
