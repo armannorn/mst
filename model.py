@@ -51,7 +51,6 @@ def compile_and_train(X_train: pd.DataFrame, y_train: pd.DataFrame,
     """
 
     optimizer = Adam(learning_rate=tconf["learning_rate"])
-
     if tconf["loss"] == "mse":
         loss = MeanSquaredError()
     elif tconf["loss"] == "mae":
@@ -81,7 +80,7 @@ def weighted_mae(y_true, y_pred, a):
     """
 
     # Compute weights
-    weights = ((y_pred+0.0000000001) / 5.0) ** a
+    weights = ((y_true+0.0000000001) / 5.0) ** a
     weights = tf.maximum(weights, 1.0)
 
     tf.debugging.check_numerics(weights, "Weights contain NaNs or Infs")

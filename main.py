@@ -104,13 +104,13 @@ if __name__ == '__main__':
         "note": "5 other"
     }
 
-    for a in [1, 2]:
+    for a in [0, 1, 2]:
         config["training"] = {
             "optimizer": "adam",
             "learning_rate": 0.0005,
             "loss": "weighted",
             "parameters": {"a": a},
-            "epochs": 20,
+            "epochs": 150,
             "test_split": 0.2,
             "batch_size": 256
         }
