@@ -6,13 +6,14 @@
         "target": "f",
         "features":
         {
-            "location": false,
+            "location": true,
             "predictions": ["f15"],
-            "elevation": 0,
-            "various": []
+            "elevation": 20000,
+            "various": ["ocean_wind_indicator", "TRI", "min_dist_to_ocean"]
         }
     },
     "scaling": {
+        "use": false,
         "standard": ["predictions"],
         "minmax": ["location", "elevation", "TRI", "min_dist_to_ocean"]
     },
@@ -55,11 +56,11 @@
     },
     "training": {
         "learning_rate": 0.0005,
-        "loss": "weighted",
+        "loss": "mae",
         "parameters": {"a": 0},
-        "epochs": 10,
+        "epochs": 150,
         "test_split": 0.2,
-        "batch_size": 256
+        "batch_size": 512
     },
     "note": "1 baseline",
     "png_name": true

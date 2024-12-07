@@ -124,7 +124,11 @@ def apply_scaling(X: pd.DataFrame, sconf: dict) -> (pd.DataFrame, dict):
     :param sconf: scaling configuration
     :return: scaled data and scalers
     """
+
     scalers = {}
+
+    if not sconf["use"]:
+        return X, scalers
 
     if sconf.get('standard'):
         X, scalers['standard'] = apply_standard_scaling(X, sconf)

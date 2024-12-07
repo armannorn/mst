@@ -96,24 +96,22 @@ if __name__ == '__main__':
     # f15 + TRI
     config = load_json()
 
-    feature_config = {
-        "location": True,
-        "predictions": ["f15"],
-        "elevation": 20000,
-        "various": ["min_dist_to_ocean", "ocean_wind_indicator", "TRI"],
-        "note": "5 other"
-    }
 
-    for a in [0, 1, 2]:
-        config["training"] = {
-            "optimizer": "adam",
-            "learning_rate": 0.0005,
-            "loss": "weighted",
-            "parameters": {"a": a},
-            "epochs": 150,
-            "test_split": 0.2,
-            "batch_size": 256
-        }
-        config["data"]["features"] = feature_config
-        config["note"] = f"a = {a}"
-        run(config)
+
+    config["scaling"] = {
+        "use": False,
+        "standard": ["predictions"],
+        "minmax": ["location", "elevation", "TRI", "min_dist_to_ocean"]
+    }
+    config["note"] = "No scaling"
+
+    run(config)
+
+    config["scaling"] = {
+        "use": False,
+        "standard": ["predictions"],
+        "minmax": ["location", "elevation", "TRI", "min_dist_to_ocean"]
+    }
+    config["note"] = "Scaled"
+
+    run(config)

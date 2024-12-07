@@ -1,5 +1,6 @@
 import pandas as pd
 import tensorflow as tf
+
 from keras import Sequential
 from keras.layers import Dense, Dropout, Conv2D, Flatten
 from keras.losses import MeanSquaredError, MeanAbsoluteError
@@ -104,3 +105,6 @@ def weighted_MAE_wrapper(a: float) -> callable:
     def loss(y_true, y_pred):
         return weighted_mae(y_true, y_pred, a)
     return loss
+
+if __name__ == '__main__':
+    pass
