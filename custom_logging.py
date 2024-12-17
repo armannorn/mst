@@ -31,6 +31,17 @@ def prepare_features(fconf):
 
 
 def log_results(cv_results, config=None, start=datetime.now(), test_mae=0.0, note=""):
+    # Set global font size
+    plt.rcParams.update({
+        'font.size': 16,  # Base font size for everything
+        'axes.titlesize': 18,  # Font size for axes titles
+        'axes.labelsize': 16,  # Font size for x and y labels
+        'xtick.labelsize': 14,  # Font size for x-axis tick labels
+        'ytick.labelsize': 14,  # Font size for y-axis tick labels
+        'legend.fontsize': 14,  # Font size for legend text
+        'figure.titlesize': 20  # Font size for the figure title
+    })
+
     # Log training time
     training_time = datetime.now() - start
 

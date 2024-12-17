@@ -45,7 +45,6 @@ def read_data(dconf: dict[str, any]) -> (pd.DataFrame, pd.Series):
     :return: Training data with features and target
     """
     df = pd.read_feather(dconf["path"])
-
     # Utility represents a ratio of the data that is used to train. It is 1.0 except for testing purposes.
     data_utility = dconf["utility"]
     if data_utility < 1:

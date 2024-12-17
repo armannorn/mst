@@ -1,7 +1,7 @@
 {
     "cross_validation": {"n_splits":  4},
     "data": {
-        "path": "5oct.feather",
+        "path": "7Dec.feather",
         "utility": 1,
         "target": "f",
         "features":
@@ -13,7 +13,7 @@
         }
     },
     "scaling": {
-        "use": false,
+        "use": true,
         "standard": ["predictions"],
         "minmax": ["location", "elevation", "TRI", "min_dist_to_ocean"]
     },
@@ -56,11 +56,12 @@
     },
     "training": {
         "learning_rate": 0.0005,
-        "loss": "mae",
+        "loss": "mse",
         "parameters": {"a": 0},
-        "epochs": 150,
+        "epochs": 100,
         "test_split": 0.2,
-        "batch_size": 512
+        "batch_size": 512,
+        "dropout": 0.1
     },
     "note": "1 baseline",
     "png_name": true

@@ -96,22 +96,35 @@ if __name__ == '__main__':
     # f15 + TRI
     config = load_json()
 
-
-
-    config["scaling"] = {
-        "use": False,
-        "standard": ["predictions"],
-        "minmax": ["location", "elevation", "TRI", "min_dist_to_ocean"]
+    config["training"] = {
+        "learning_rate": 0.0005,
+        "loss": "weighted",
+        "parameters": {"a": 0},
+        "epochs": 150,
+        "test_split": 0.2,
+        "batch_size": 512
     }
-    config["note"] = "No scaling"
-
+    config["note"] = "a = 0"
     run(config)
 
-    config["scaling"] = {
-        "use": False,
-        "standard": ["predictions"],
-        "minmax": ["location", "elevation", "TRI", "min_dist_to_ocean"]
+    config["training"] = {
+        "learning_rate": 0.0005,
+        "loss": "weighted",
+        "parameters": {"a": 1},
+        "epochs": 150,
+        "test_split": 0.2,
+        "batch_size": 512
     }
-    config["note"] = "Scaled"
+    config["note"] = "a = 1"
+    run(config)
 
+    config["training"] = {
+        "learning_rate": 0.0005,
+        "loss": "weighted",
+        "parameters": {"a": 1},
+        "epochs": 150,
+        "test_split": 0.2,
+        "batch_size": 512
+    }
+    config["note"] = "a = 2"
     run(config)
